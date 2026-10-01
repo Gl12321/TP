@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вопросы к данным — концепт рабочего пространства</title>
+  <style>
+    :root { color-scheme: light; --ink:#172b34; --muted:#61727b; --line:#dde5e6; --paper:#fff; --bg:#f5f7f7; --accent:#14675d; --soft:#eaf4ef; --warm:#fff5df; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    button:disabled { cursor:default; opacity:.6; }
+    button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible { outline:3px solid #d28d27; outline-offset:3px; }
+    button { color:inherit; }
+    [hidden] { display:none!important; }
+    h1,h2,h3,p { margin:0; }
+    h1 { font-size:29px; line-height:1.2; font-weight:650; letter-spacing:-.9px; }
+    h2 { font-size:18px; font-weight:650; letter-spacing:-.3px; }
+    h3 { font-size:14px; font-weight:650; }
+    .demo { padding:10px 24px; background:#fff7e7; border-bottom:1px solid #eedfbf; color:#725423; font-size:12px; text-align:center; }
+    .demo strong { font-weight:650; }
+    .shell { display:grid; grid-template-columns:220px minmax(0,1fr); min-height:calc(100vh - 40px); }
+    .sidebar { background:#edf2f1; border-right:1px solid var(--line); padding:28px 18px; display:flex; flex-direction:column; gap:26px; }
+    .brand { display:flex; align-items:center; gap:10px; padding:0 10px; font-size:17px; font-weight:700; letter-spacing:-.4px; }
+    .mark { background:var(--accent); border-radius:10px; width:34px; height:34px; display:grid; place-items:center; color:white; }
+    .mark svg { width:23px; height:23px; }
+    .eyebrow { text-transform:uppercase; font-size:10px; letter-spacing:1.2px; color:var(--muted); font-weight:700; }
+    nav { display:grid; gap:5px; }
+    .nav { display:flex; align-items:center; gap:11px; width:100%; padding:11px 12px; background:none; border:0; border-radius:8px; text-align:left; color:#52666e; }
+    .nav svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.7; }
+    .nav[aria-current="page"] { background:white; color:var(--accent); box-shadow:0 2px 6px #183b2c07; font-weight:650; }
+    .count { margin-left:auto; padding:0 7px; border-radius:5px; background:#e8eeed; font-size:11px; }
+    .history-block { border-top:1px solid #d9e2df; padding:21px 4px 0; }
+    .history { display:grid; gap:6px; margin-top:12px; }
+    .history button { text-align:left; padding:9px 10px; border:1px solid transparent; border-radius:7px; background:transparent; font-size:12px; }
+    .history button.active { background:#e0ebe6; border-color:#c9d9d0; }
+    .history small { display:block; color:var(--muted); font-size:10px; margin-top:3px; }
+    .sidebar-note { margin-top:auto; padding:15px 9px 0; border-top:1px solid #d9e2df; color:var(--muted); font-size:11px; }
+    .workspace { padding:31px 34px; max-width:1550px; width:100%; margin:auto; align-self:start; }
+    .page-top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:25px; }
+    .page-top p { margin-top:7px; color:var(--muted); }
+    .source-pill { display:inline-flex; gap:7px; align-items:center; font-size:12px; padding:7px 11px; border:1px solid var(--line); border-radius:20px; background:white; white-space:nowrap; }
+    .dot { width:6px; height:6px; border-radius:50%; background:#32907d; }
+    .analysis-grid { display:grid; grid-template-columns:minmax(0,1fr) 290px; gap:22px; align-items:start; }
+    .main-column { display:grid; gap:18px; min-width:0; }
+    .card { background:var(--paper); border:1px solid var(--line); border-radius:12px; box-shadow:0 3px 10px #183b2c03; }
+    .question { padding:22px 24px; }
+    .question p { font-size:20px; line-height:1.4; letter-spacing:-.4px; margin:9px 0 11px; }
+    .hint { color:var(--muted); font-size:12px; }
+    .question-foot { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid #edf0f0; }
+    .text-button { background:none; border:0; color:var(--accent); padding:3px 0; font-size:12px; font-weight:650; }
+    .clarify { padding:18px 22px; background:#f1f7f3; border-color:#d1e1d7; }
+    .clarify p { font-size:12px; margin:4px 0 13px; color:#53685c; }
+    .choices { display:grid; grid-template-columns:1fr 1fr; gap:9px; border:0; margin:0; padding:0; }
+    .choice { display:flex; align-items:flex-start; gap:8px; padding:11px; border:1px solid #d8e3dc; background:#fff; border-radius:8px; cursor:pointer; }
+    .choice:has(input:checked) { border-color:var(--accent); background:#fafdfb; box-shadow:0 0 0 1px var(--accent); }
+    .choice input { accent-color:var(--accent); margin-top:4px; }
+    .choice strong { font-size:12px; display:block; }
+    .choice small { font-size:11px; color:var(--muted); display:block; margin-top:3px; }
+    .filters { display:flex; gap:13px; flex-wrap:wrap; margin-top:17px; }
+    .filters label { font-size:11px; color:var(--muted); flex:1; min-width:160px; }
+    select { display:block; width:100%; padding:9px 32px 9px 10px; margin-top:5px; border:1px solid var(--line); border-radius:7px; background:white; color:var(--ink); }
+    .answer-head { padding:22px 24px 17px; }
+    .answer-title { display:flex; gap:12px; justify-content:space-between; align-items:start; }
+    .answer-title p { color:var(--muted); font-size:12px; margin-top:4px; }
+    .button { border:1px solid #cfd9d8; border-radius:7px; background:white; padding:8px 12px; font-size:12px; font-weight:600; }
+    .primary { background:var(--accent); border-color:var(--accent); color:white; }
+    .button:hover:not(:disabled) { filter:brightness(.96); }
+    .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:15px; }
+    .chip { border-radius:5px; padding:4px 7px; font-size:10px; background:#f0f4f4; color:#4d6269; }
+    .chip.green { background:var(--soft); color:var(--accent); }
+    .summary { display:grid; grid-template-columns:1fr 1fr; margin:0 24px 17px; padding:17px 0; border-top:1px solid #edf0f0; border-bottom:1px solid #edf0f0; gap:20px; }
+    .summary span { display:block; color:var(--muted); font-size:11px; }
+    .summary strong { display:block; font-size:25px; letter-spacing:-.8px; font-weight:650; margin:3px 0; }
+    .summary small { color:var(--muted); font-size:10px; }
+    .tabs { display:flex; gap:18px; padding:0 24px; border-bottom:1px solid var(--line); }
+    .tab { border:0; background:none; font-size:12px; padding:10px 0; color:var(--muted); border-bottom:2px solid transparent; }
+    .tab[aria-selected="true"] { border-color:var(--accent); color:var(--accent); font-weight:650; }
+    .table-wrap { overflow:auto; }
+    table { border-collapse:collapse; width:100%; font-size:12px; font-variant-numeric:tabular-nums; }
+    th { font-weight:600; font-size:11px; text-align:left; background:#fafbfb; color:#61717a; padding:12px 18px; border-bottom:1px solid #e7eded; white-space:nowrap; }
+    th:first-child,td:first-child { padding-left:24px; }
+    th small { display:block; color:#93a0a5; font-size:9px; font-weight:400; margin-top:3px; }
+    td { padding:14px 18px; border-bottom:1px solid #edf0f0; white-space:nowrap; }
+    th.num,td.num { text-align:right; }
+    tr:last-child td { border-bottom:0; }
+    .answer-foot { display:flex; justify-content:space-between; gap:10px; border-top:1px solid #e7eded; padding:13px 24px; font-size:10px; color:var(--muted); }
+    .chart-panel { padding:18px 18px 6px; }
+    .chart-panel svg { display:block; width:100%; height:auto; }
+    .chart-panel p { color:var(--muted); font-size:11px; padding:0 6px 13px; }
+    .evidence { display:grid; gap:13px; }
+    .evidence-head { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:650; margin:2px 0; }
+    details { background:white; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+    summary { padding:15px 16px; cursor:pointer; font-size:12px; font-weight:650; }
+    .details-body { padding:0 16px 16px; font-size:12px; }
+    .details-body p { color:var(--muted); }
+    .definition { color:var(--ink)!important; margin-bottom:14px; }
+    dl { margin:0; }
+    dt { color:#7a8990; font-size:10px; margin:13px 0 3px; }
+    dd { margin:0; font-size:11px; overflow-wrap:anywhere; }
+    .code { overflow:auto; background:#f4f7f7; border:1px solid #e2e9e8; border-radius:6px; padding:12px; margin:10px 0 0; font:10px/1.7 ui-monospace,Consolas,monospace; color:#274c4d; tab-size:2; }
+    .note { color:var(--muted); padding:1px 3px; font-size:11px; }
+    .notice { font-size:11px; padding:10px 12px; color:var(--accent); background:var(--soft); border:1px solid #d6e6da; border-radius:7px; }
+    .intro { color:var(--muted); margin:8px 0 22px; max-width:750px; }
+    .data-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .data-card { padding:24px; }
+    .data-card h3 { font-size:19px; margin:8px 0; }
+    .data-card p { color:var(--muted); font-size:12px; margin-bottom:16px; }
+    .data-card ul { font-size:12px; padding-left:18px; color:#4a6069; line-height:1.9; }
+    .saved-list { display:grid; gap:12px; }
+    .saved-card { display:flex; gap:20px; justify-content:space-between; align-items:center; padding:20px 24px; }
+    .saved-card p { color:var(--muted); font-size:12px; margin-top:5px; }
+    .empty { padding:36px; text-align:center; }
+    .empty p { color:var(--muted); margin:7px 0 18px; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    @media (min-width:1600px) { .workspace { padding-top:40px; } }
+    @media (max-width:1200px) { .workspace { padding:25px 23px; } .analysis-grid { grid-template-columns:minmax(0,1fr); } .evidence { grid-template-columns:1fr 1fr; } .evidence-head,.evidence>.note { grid-column:1/-1; } }
+    @media (max-width:760px) { .shell { grid-template-columns:1fr; } .sidebar { padding:16px; gap:15px; border-right:0; border-bottom:1px solid var(--line); } .brand { padding:0; } nav { grid-template-columns:repeat(3,1fr); } .nav { justify-content:center; padding:9px 5px; gap:6px; font-size:12px; } .history-block { padding-top:12px; } .history { display:flex; overflow:auto; gap:8px; margin-top:7px; } .history button { min-width:155px; } .sidebar-note { display:none; } .workspace { padding:23px 15px; } .page-top { align-items:start; } h1 { font-size:25px; } .source-pill { display:none; } .choices,.data-grid { grid-template-columns:1fr; } .evidence { grid-template-columns:1fr; } .demo { padding:9px 12px; font-size:10px; } .question,.answer-head,.data-card { padding:19px; } .summary { margin:0 19px 12px; } .summary strong { font-size:22px; } .saved-card { padding:18px; align-items:start; } }
+  </style>
+</head>
+<body>
+  <div class="demo"><strong>Концепт · демонстрационные данные · без подключения к БД</strong> — все числа вымышлены; изменения выполняются только на этой странице.</div>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Навигация рабочего пространства">
+      <div class="brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 17V8m8 9V4m8 13v-6M3 21h18"/></svg></span>Вопросы к данным</div>
+      <nav aria-label="Разделы">
+        <button class="nav" data-page="data"><svg viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="4" rx="6" ry="2.5"/><path d="M4 4v11c0 3.5 12 3.5 12 0V4M4 9c0 3.5 12 3.5 12 0"/></svg>Данные</button>
+        <button class="nav" data-page="analysis" aria-current="page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16V9m7 7V3m7 13V6M2 18h16"/></svg>Анализы</button>
+        <button class="nav" data-page="saved"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3h10v14l-5-3-5 3z"/></svg>Сохранённое<span class="count" id="saved-count">0</span></button>
+      </nav>
+      <div class="history-block"><div class="eyebrow">В этой сессии</div><div class="history" id="history"></div></div>
+      <div class="sidebar-note">Пример будущего интерфейса.<br>История и сохранения живут в памяти страницы и исчезают при её обновлении.</div>
+    </aside>
+    <main class="workspace">
+      <section id="page-analysis" aria-labelledby="analysis-heading">
+        <header class="page-top"><div><h1 id="analysis-heading">От вопроса — к пониманию</h1><p>Исследуйте данные и проверяйте, как получен ответ.</p></div><span class="source-pill"><span class="dot"></span>Магазин · пример</span></header>
+        <div class="analysis-grid">
+          <div class="main-column">
+            <section class="card question" aria-labelledby="question-title"><div class="eyebrow" id="question-title">Ваш вопрос · пример</div><p>Как менялась выручка по месяцам?</p><span class="hint">Здесь можно изменить определение, период и регион. Свободная генерация вопросов в концепте не реализована.</span><div class="question-foot"><span class="hint">Источник: магазин · sales.orders</span><button class="text-button" id="toggle-clarify" aria-expanded="true" aria-controls="clarification">Скрыть параметры</button></div></section>
+            <section class="card clarify" id="clarification" aria-labelledby="clarify-heading"><h3 id="clarify-heading">Что считать выручкой?</h3><p>Определение влияет на результат. Выберите правило расчёта.</p><fieldset class="choices"><legend class="sr-only">Определение выручки</legend><label class="choice"><input type="radio" name="metric" value="paid" checked><span><strong>Оплаченные заказы</strong><small>Сумма заказов со статусом paid</small></span></label><label class="choice"><input type="radio" name="metric" value="all"><span><strong>Все созданные заказы</strong><small>Включая ещё не оплаченные</small></span></label></fieldset><div class="filters"><label>Период<select id="period"><option value="quarter">Июль — сентябрь 2026</option><option value="half">Апрель — сентябрь 2026</option></select></label><label>Регион<select id="region"><option value="all">Все регионы</option><option value="moscow">Москва</option><option value="spb">Санкт-Петербург</option></select></label></div></section>
+            <article class="card" aria-labelledby="result-heading"><div class="answer-head"><div class="answer-title"><div><h2 id="result-heading">Выручка по месяцам</h2><p id="result-subtitle"></p></div><button class="button" id="save">Сохранить</button></div><div class="chips" id="chips"></div></div><div class="summary"><div><span id="total-label">Сумма оплаченных заказов</span><strong id="total"></strong><small>За выбранный период</small></div><div><span>Количество заказов</span><strong id="orders"></strong><small>С теми же условиями отбора</small></div></div><div class="tabs" role="tablist" aria-label="Представление результата"><button class="tab" role="tab" id="tab-table" aria-selected="true" aria-controls="panel-table" tabindex="0">Таблица</button><button class="tab" role="tab" id="tab-chart" aria-selected="false" aria-controls="panel-chart" tabindex="-1">График</button></div><div id="panel-table" role="tabpanel" aria-labelledby="tab-table"><div class="table-wrap"><table><caption class="sr-only">Вымышленная выручка по месяцам с выбранными условиями</caption><thead><tr><th scope="col">Месяц<small>дата · начало месяца</small></th><th scope="col" class="num">Выручка, ₽<small>decimal · рубли</small></th><th scope="col" class="num">Заказы<small>integer · шт.</small></th></tr></thead><tbody id="rows"></tbody></table></div></div><div id="panel-chart" role="tabpanel" aria-labelledby="tab-chart" hidden><div class="chart-panel"><svg id="chart" viewBox="0 0 620 300" role="img" aria-labelledby="chart-title chart-description"></svg><p>Те же месяцы и суммы, что в таблице. Шкала начинается с нуля.</p></div></div><div class="answer-foot"><span id="row-count"></span><span>Вся демонстрационная выборка</span></div></article>
+            <div id="notice" class="notice" role="status" aria-live="polite">Можно менять условия: таблица, график и SQL обновляются вместе, без вызова модели.</div>
+          </div>
+          <aside class="evidence" aria-label="Проверка расчёта"><div class="evidence-head">Как получен результат</div><details open><summary>Определение и условия</summary><div class="details-body"><p class="definition" id="definition"></p><dl><dt>Даты отбора</dt><dd id="date-description"></dd><dt>Регион</dt><dd id="region-description"></dd><dt>Уровень данных</dt><dd>Одна запись — один заказ.<br>Группировка — календарный месяц.</dd><dt>Единица</dt><dd>Рубли; другие валюты отсутствуют в примере.</dd></dl></div></details><details open><summary>Источник и полнота</summary><div class="details-body"><dl><dt>Таблица</dt><dd>sales.orders</dd><dt>Набор</dt><dd>Вымышленный магазин · DEMO-01</dd><dt>Доступные даты</dt><dd>01.04.2026 — 30.09.2026</dd><dt>Полнота</dt><dd>Все строки локального примера. Усечения нет.</dd></dl></div></details><details id="sql-details"><summary>SQL с выбранными условиями</summary><div class="details-body"><p>Запрос показан для проверки логики. Он не отправляется в БД и не выполняется.</p><pre class="code"><code id="sql"></code></pre></div></details><p class="note">Это объяснение задано правилами примера. Модель не генерирует ни числа, ни описание.</p></aside>
+        </div>
+      </section>
+      <section id="page-data" aria-labelledby="data-heading" hidden><header class="page-top"><div><h1 id="data-heading">Понятные данные — точные вопросы</h1><p>Будущий каталог источников, их смысла и ограничений.</p></div></header><div class="data-grid"><article class="card data-card"><div class="eyebrow">Демонстрационный источник</div><h3>Магазин</h3><p>Заказы из Москвы и Санкт-Петербурга за апрель — сентябрь 2026. Все значения вымышлены.</p><ul><li>Одна таблица: sales.orders</li><li>Одна строка соответствует заказу</li><li>Валюта — рубли</li><li>Статусы в примере: paid и pending</li></ul><button class="button primary" data-open-analysis>Открыть пример анализа</button></article><article class="card data-card"><div class="eyebrow">Поля и смысл</div><h3>Что можно спросить</h3><p>Пример связывает знакомые слова с конкретными полями.</p><table><thead><tr><th scope="col">Поле</th><th scope="col">Значение</th></tr></thead><tbody><tr><td>created_at</td><td>Дата создания</td></tr><tr><td>amount</td><td>Сумма в рублях</td></tr><tr><td>status</td><td>Оплата заказа</td></tr><tr><td>region</td><td>Регион заказа</td></tr></tbody></table></article></div><p class="intro">В этом концепте нет импорта, профилирования и подключения к настоящим источникам. Раздел показывает предполагаемое место каталога данных.</p></section>
+      <section id="page-saved" aria-labelledby="saved-heading" hidden><header class="page-top"><div><h1 id="saved-heading">К хорошему анализу легко вернуться</h1><p>Сохранённые варианты с теми же определениями и фильтрами.</p></div></header><p class="intro">Сохранения доступны только в памяти этой страницы. После обновления вкладки список будет пуст. Здесь не создаются файлы и записи в БД.</p><div class="saved-list" id="saved-list"></div></section>
+    </main>
+  </div>
+  <script>
+    const facts = [
+      ['2026-04-01','moscow',128000,18000,103,17], ['2026-04-01','spb',74000,12000,65,11],
+      ['2026-05-01','moscow',132000,22000,111,20], ['2026-05-01','spb',82000,11000,69,10],
+      ['2026-06-01','moscow',149000,19000,117,18], ['2026-06-01','spb',78000,16000,68,15],
+      ['2026-07-01','moscow',157000,27000,126,24], ['2026-07-01','spb',91000,13000,76,12],
+      ['2026-08-01','moscow',173000,26000,139,23], ['2026-08-01','spb',97000,16000,81,14],
+      ['2026-09-01','moscow',184000,32000,146,27], ['2026-09-01','spb',105000,15000,87,13]
+    ];
+    const regions = {all:'Все регионы',moscow:'Москва',spb:'Санкт-Петербург'};
+    const periods = {quarter:{start:'2026-07-01',label:'Июль — сентябрь 2026',date:'01.07.2026'},half:{start:'2026-04-01',label:'Апрель — сентябрь 2026',date:'01.04.2026'}};
+    const labels = {paid:'Оплаченные заказы',all:'Все созданные заказы'};
+    const formatter = new Intl.NumberFormat('ru-RU');
+    const money = value => formatter.format(value) + ' ₽';
+    const monthName = value => new Intl.DateTimeFormat('ru-RU',{month:'long',timeZone:'UTC'}).format(new Date(value + 'T12:00:00Z'));
+    const shortMonth = value => new Intl.DateTimeFormat('ru-RU',{month:'short',timeZone:'UTC'}).format(new Date(value + 'T12:00:00Z'));
+    const $ = id => document.getElementById(id);
+    let state = {metric:'paid',period:'quarter',region:'all'};
+    let view = 'table';
+    let currentId = 0;
+    const history = [];
+    const saved = [];
+    const same = (a,b) => a.metric === b.metric && a.period === b.period && a.region === b.region;
+
+    function calculate(value) {
+      const groups = new Map();
+      for (const [date,region,paid,pending,paidOrders,pendingOrders] of facts) {
+        if (date < periods[value.period].start || (value.region !== 'all' && region !== value.region)) continue;
+        const item = groups.get(date) || {date,amount:0,orders:0};
+        item.amount += paid + (value.metric === 'all' ? pending : 0);
+        item.orders += paidOrders + (value.metric === 'all' ? pendingOrders : 0);
+        groups.set(date,item);
+      }
+      return [...groups.values()].sort((a,b) => a.date.localeCompare(b.date));
+    }
+
+    function sqlFor(value) {
+      const filters = [`t0."created_at" >= DATE '${periods[value.period].start}'`,`t0."created_at" < DATE '2026-10-01'`];
+      if (value.metric === 'paid') filters.push(`t0."status" = 'paid'`);
+      if (value.region !== 'all') filters.push(`t0."region" = '${regions[value.region]}'`);
+      return `SELECT\n  DATE_TRUNC('month', t0."created_at") AS "Месяц",\n  SUM(t0."amount") AS "Выручка",\n  COUNT(*) AS "Заказы"\nFROM "sales"."orders" AS t0\nWHERE ${filters.join('\n  AND ')}\nGROUP BY DATE_TRUNC('month', t0."created_at")\nORDER BY "Месяц" ASC`;
+    }
+
+    function setPage(page) {
+      for (const name of ['analysis','data','saved']) $('page-' + name).hidden = name !== page;
+      document.querySelectorAll('[data-page]').forEach(button => {
+        if (button.dataset.page === page) button.setAttribute('aria-current','page');
+        else button.removeAttribute('aria-current');
+      });
+      if (page === 'saved') renderSaved();
+    }
+
+    function setView(next,focus = false) {
+      view = next;
+      for (const name of ['table','chart']) {
+        $('panel-' + name).hidden = next !== name;
+        $('tab-' + name).setAttribute('aria-selected',String(next === name));
+        $('tab-' + name).tabIndex = next === name ? 0 : -1;
+      }
+      if (focus) $('tab-' + next).focus();
+    }
+
+    function record() {
+      const previous = history.find(item => same(item,state));
+      if (previous) currentId = previous.id;
+      else {
+        currentId = history.length + 1;
+        history.push({...state,id:currentId});
+      }
+    }
+
+    function open(item) {
+      state = {metric:item.metric,period:item.period,region:item.region};
+      record();
+      render();
+      setPage('analysis');
+      $('notice').textContent = 'Восстановлены определение, период и регион выбранного анализа. Данные остаются демонстрационными.';
+    }
+
+    function renderHistory() {
+      $('history').replaceChildren();
+      for (const item of [...history].reverse().slice(0,6)) {
+        const button = document.createElement('button');
+        button.className = item.id === currentId ? 'active' : '';
+        button.textContent = `${item.id.toString().padStart(2,'0')} · ${labels[item.metric]}`;
+        button.setAttribute('aria-label',`Вернуться: ${labels[item.metric]}, ${periods[item.period].label}, ${regions[item.region]}`);
+        const note = document.createElement('small');
+        note.textContent = `${regions[item.region]} · ${item.period === 'quarter' ? '3' : '6'} мес.`;
+        button.append(note);
+        button.addEventListener('click',() => open(item));
+        $('history').append(button);
+      }
+    }
+
+    function renderSaved() {
+      $('saved-count').textContent = saved.length;
+      $('saved-list').replaceChildren();
+      if (!saved.length) {
+        const empty = document.createElement('div');
+        empty.className = 'card empty';
+        const title = document.createElement('h2');
+        title.textContent = 'Пока нет сохранённых анализов';
+        const text = document.createElement('p');
+        text.textContent = 'Выберите условия в примере и нажмите «Сохранить» рядом с результатом.';
+        const button = document.createElement('button');
+        button.className = 'button primary';
+        button.textContent = 'Вернуться к примеру';
+        button.addEventListener('click',() => setPage('analysis'));
+        empty.append(title,text,button);
+        $('saved-list').append(empty);
+      }
+      for (const item of saved) {
+        const card = document.createElement('article');
+        card.className = 'card saved-card';
+        const content = document.createElement('div');
+        const title = document.createElement('h3');
+        title.textContent = 'Выручка · ' + labels[item.metric].toLowerCase();
+        const text = document.createElement('p');
+        text.textContent = `${periods[item.period].label} · ${regions[item.region]}`;
+        const total = document.createElement('p');
+        total.textContent = money(calculate(item).reduce((sum,row) => sum + row.amount,0)) + ' · вымышленный результат';
+        content.append(title,text,total);
+        const button = document.createElement('button');
+        button.className = 'button';
+        button.textContent = 'Открыть';
+        button.setAttribute('aria-label',`Открыть сохранённый анализ: ${labels[item.metric]}, ${periods[item.period].label}, ${regions[item.region]}`);
+        button.addEventListener('click',() => open(item));
+        card.append(content,button);
+        $('saved-list').append(card);
+      }
+    }
+
+    function renderChart(rows) {
+      const top = Math.ceil(Math.max(...rows.map(row => row.amount)) / 100000) * 100000;
+      const left = 62, width = 536, baseline = 238, height = 190;
+      const step = width / rows.length;
+      let svg = `<title id="chart-title">Выручка по месяцам</title><desc id="chart-description">${labels[state.metric]}. ${regions[state.region]}. ${periods[state.period].label}. Все значения вымышлены; те же числа доступны в таблице.</desc>`;
+      for (let i = 0; i <= 4; i++) {
+        const y = baseline - i * height / 4;
+        svg += `<line x1="${left}" x2="598" y1="${y}" y2="${y}" stroke="#e4eae8"/><text x="50" y="${y + 4}" text-anchor="end" fill="#78898e" font-size="10">${formatter.format(top * i / 4000)} тыс.</text>`;
+      }
+      rows.forEach((row,index) => {
+        const barHeight = row.amount / top * height;
+        const x = left + index * step + step * .2;
+        const barWidth = step * .6;
+        svg += `<rect x="${x}" y="${baseline - barHeight}" width="${barWidth}" height="${barHeight}" rx="4" fill="${index === rows.length - 1 ? '#176b5e' : '#76aa99'}"><title>${monthName(row.date)}: ${money(row.amount)}</title></rect><text x="${x + barWidth / 2}" y="${baseline - barHeight - 10}" text-anchor="middle" fill="#385e55" font-size="11">${formatter.format(row.amount / 1000)} тыс.</text><text x="${x + barWidth / 2}" y="261" text-anchor="middle" fill="#72848a" font-size="11">${shortMonth(row.date)}</text>`;
+      });
+      $('chart').innerHTML = svg;
+    }
+
+    function render() {
+      const rows = calculate(state);
+      document.querySelector(`input[name="metric"][value="${state.metric}"]`).checked = true;
+      $('period').value = state.period;
+      $('region').value = state.region;
+      $('result-subtitle').textContent = periods[state.period].label + ' · демонстрационный расчёт';
+      $('total-label').textContent = state.metric === 'paid' ? 'Сумма оплаченных заказов' : 'Сумма всех созданных заказов';
+      $('total').textContent = money(rows.reduce((sum,row) => sum + row.amount,0));
+      $('orders').textContent = formatter.format(rows.reduce((sum,row) => sum + row.orders,0));
+      $('chips').replaceChildren();
+      for (const [index,text] of [labels[state.metric],regions[state.region],periods[state.period].label].entries()) {
+        const chip = document.createElement('span');
+        chip.className = index === 0 ? 'chip green' : 'chip';
+        chip.textContent = text;
+        $('chips').append(chip);
+      }
+      $('rows').replaceChildren();
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+        const name = monthName(row.date);
+        [name[0].toUpperCase() + name.slice(1) + ' 2026',formatter.format(row.amount),formatter.format(row.orders)].forEach((value,index) => {
+          const td = document.createElement('td');
+          td.textContent = value;
+          if (index) td.className = 'num';
+          tr.append(td);
+        });
+        $('rows').append(tr);
+      }
+      $('row-count').textContent = `${rows.length} ${rows.length === 3 ? 'строки' : 'строк'} · 3 колонки`;
+      $('definition').textContent = state.metric === 'paid' ? 'Суммируем amount только для заказов со статусом paid. Месяц определяется датой создания заказа, а не датой оплаты.' : 'Суммируем amount для всех созданных заказов, включая pending. Это сумма заказов, а не подтверждённые поступления денег.';
+      $('date-description').textContent = `С ${periods[state.period].date} включительно до 01.10.2026 не включительно.`;
+      $('region-description').textContent = regions[state.region];
+      $('sql').textContent = sqlFor(state);
+      const isSaved = saved.some(item => same(item,state));
+      $('save').textContent = isSaved ? 'Сохранено' : 'Сохранить';
+      $('save').disabled = isSaved;
+      renderChart(rows);
+      renderHistory();
+      renderSaved();
+      setView(view);
+    }
+
+    function changed() {
+      state = {metric:document.querySelector('input[name="metric"]:checked').value,period:$('period').value,region:$('region').value};
+      record();
+      render();
+      $('notice').textContent = `Условия изменены: ${labels[state.metric].toLowerCase()}, ${regions[state.region]}, ${periods[state.period].label}. Таблица, график и SQL согласованы.`;
+    }
+
+    document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click',() => setPage(button.dataset.page)));
+    document.querySelectorAll('[data-open-analysis]').forEach(button => button.addEventListener('click',() => setPage('analysis')));
+    document.querySelectorAll('input[name="metric"]').forEach(input => input.addEventListener('change',changed));
+    $('period').addEventListener('change',changed);
+    $('region').addEventListener('change',changed);
+    for (const name of ['table','chart']) {
+      $('tab-' + name).addEventListener('click',() => setView(name));
+      $('tab-' + name).addEventListener('keydown',event => {
+        if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
+          event.preventDefault();
+          setView(event.key === 'Home' ? 'table' : event.key === 'End' ? 'chart' : view === 'table' ? 'chart' : 'table',true);
+        }
+      });
+    }
+    $('toggle-clarify').addEventListener('click',() => {
+      $('clarification').hidden = !$('clarification').hidden;
+      const expanded = !$('clarification').hidden;
+      $('toggle-clarify').setAttribute('aria-expanded',String(expanded));
+      $('toggle-clarify').textContent = expanded ? 'Скрыть параметры' : 'Изменить параметры';
+    });
+    $('save').addEventListener('click',() => {
+      if (!saved.some(item => same(item,state))) saved.push({...state});
+      render();
+      $('notice').textContent = 'Анализ добавлен в «Сохранённое» только в памяти страницы. После обновления вкладки он исчезнет.';
+    });
+    record();
+    render();
+  </script>
+</body>
+</html>

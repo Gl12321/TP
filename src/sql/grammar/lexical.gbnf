@@ -1,0 +1,18 @@
+ws ::= [ \t\n\r]*
+sp ::= [ \t\n\r]+
+integer ::= "0" | [1-9] [0-9]*
+number ::= integer ("." [0-9]+)?
+signed-number ::= "-"? number
+string ::= "'" ("''" | [^'\x00-\x1f])* "'"
+output-name ::= "\"" ("\"\"" | [^"\x00-\x1f])+ "\""
+boolean ::= "TRUE" | "FALSE"
+date-literal ::= "DATE" sp string
+timestamp-literal ::= "TIMESTAMP" sp string
+interval-literal ::= "INTERVAL" sp string
+atom-literal ::= string | number | boolean | "NULL" | date-literal | timestamp-literal | interval-literal
+literal ::= string | signed-number | boolean | "NULL" | date-literal | timestamp-literal | interval-literal
+date-unit ::= "'year'" | "'quarter'" | "'month'" | "'week'" | "'day'" | "'hour'" | "'minute'" | "'second'"
+extract-unit ::= "YEAR" | "QUARTER" | "MONTH" | "WEEK" | "DAY" | "DOW" | "DOY" | "HOUR" | "MINUTE" | "SECOND" | "EPOCH"
+comparison ::= "=" | "<>" | "!=" | "<=" | ">=" | "<" | ">"
+add-op ::= "+" | "-"
+mul-op ::= "*" | "/" | "%"

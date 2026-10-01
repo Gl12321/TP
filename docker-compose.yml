@@ -1,0 +1,93 @@
+x-database: &database
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_NAME: ${DB_NAME:?Use python run.py}
+  DB_USER: ${DB_USER:?Use python run.py}
+  DB_PASSWORD: ${DB_PASSWORD:?Use python run.py}
+  DB_READ_USER: ${DB_READ_USER:?Use python run.py}
+  DB_READ_PASSWORD: ${DB_READ_PASSWORD:?Use python run.py}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+    restart: "no"
+
+  prepare:
+    build:
+      context: .
+      target: prepare
+    profiles: [tools]
+    environment:
+      <<: *database
+      MODEL_PRESET: ${MODEL_PRESET:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ./models:/app/models
+      - ./config.yaml:/app/config.yaml:ro
+
+  api:
+    build:
+      context: .
+      target: api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *database
+      MODEL_PRESET: ${MODEL_PRESET:-}
+      API_TOKEN: ${API_TOKEN}
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      ANONYMIZED_TELEMETRY: "False"
+    volumes:
+      - ./models:/app/models:ro
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3).close()"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10m
+      retries: 6
+    stop_grace_period: 45s
+    restart: "no"
+
+  ui:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_URL: http://api:8000
+      API_TOKEN: ${API_TOKEN}
+      SQL_AGENT_CONFIG: /app/config.yaml
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "127.0.0.1:8501:8501"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3).close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    mem_limit: 768m
+    restart: "no"
+
+volumes:
+  postgres_data:

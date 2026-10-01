@@ -1,0 +1,84 @@
+model: qwen3-8b
+
+settings:
+  MAX_UPLOAD_BYTES: 268435456
+  MAX_RESULT_ROWS: 1000
+  MAX_RESULT_BYTES: 4194304
+  SQL_TIMEOUT_MS: 30000
+  SQL_LOCK_TIMEOUT_MS: 3000
+  LLM_TIMEOUT_SECONDS: 600
+  MIN_FREE_MEMORY_MB: 2048
+  MAX_CORRECTIONS: 3
+  RETRIEVAL_TOP_K: 10
+  CONTEXT_MAX_TABLES: 12
+  EMBEDDING_BATCH_SIZE: 8
+  RERANKER_BATCH_SIZE: 8
+  EVENT_QUEUE_SIZE: 64
+
+generation:
+  temperature: 0.0
+  max_tokens: 512
+  n_ctx: 8192
+  n_batch: 256
+  n_ubatch: 128
+  n_gpu_layers: 0
+  n_threads: null
+  n_threads_batch: null
+  use_mmap: true
+  verbose: false
+
+models:
+  qwen3-8b:
+    label: Qwen3 8B, Q4_K_M
+    repo_id: Qwen/Qwen3-8B-GGUF
+    revision: 7c41481f57cb95916b40956ab2f0b139b296d974
+    filename: Qwen3-8B-Q4_K_M.gguf
+    size_bytes: 5027783488
+    sha256: d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785
+  qwen3-14b:
+    label: Qwen3 14B, Q4_K_M
+    repo_id: Qwen/Qwen3-14B-GGUF
+    revision: 530227a7d994db8eca5ab5ced2fb692b614357fd
+    filename: Qwen3-14B-Q4_K_M.gguf
+    size_bytes: 9001752960
+    sha256: 500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0
+    params:
+      n_ctx: 4096
+  qwen3.5-27b:
+    label: Qwen3.5 27B, Q3_K_M
+    repo_id: unsloth/Qwen3.5-27B-GGUF
+    revision: 3221f178a6b842d04f1fb42f1c413534adcc0a6a
+    filename: Qwen3.5-27B-Q3_K_M.gguf
+    size_bytes: 13505116064
+    sha256: f08ce37ebe8a7130db0c198262336773976b1e374f2444f898c41117710f0bb3
+    params:
+      n_ctx: 4096
+      n_batch: 128
+
+retrieval_models:
+  embedder:
+    repo_id: BAAI/bge-m3
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
+    max_length: 1024
+    files:
+      config.json: e6eda1c72da8f9dc30fdd9b69c73d35af3b7a7ad
+      config_sentence_transformers.json: 1fba91c78a6c8e17227058ab6d4d3acb5d8630a9
+      modules.json: 952a9b81c0bfd99800fabf352f69c7ccd46c5e43
+      sentence_bert_config.json: 0140ba1eac83a3c9b857d64baba91969d988624b
+      1_Pooling/config.json: 9bd85925f325e25246d94c4918dc02ab98f2a1b7
+      pytorch_model.bin: b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38
+      sentencepiece.bpe.model: cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865
+      special_tokens_map.json: b1879d702821e753ffe4245048eee415d54a9385
+      tokenizer.json: 21106b6d7dab2952c1d496fb21d5dc9db75c28ed361a05f5020bbba27810dd08
+      tokenizer_config.json: dc69ac559dcba2694012009aaa108c614541789a
+  reranker:
+    repo_id: BAAI/bge-reranker-base
+    revision: 2cfc18c9415c912f9d8155881c133215df768a70
+    max_length: 512
+    files:
+      config.json: ff248a5f7d76e27b10778b3c593c9fba1df4c448
+      model.safetensors: ced967c45fd1902eb92716c9ceeca7c95a936770ea9db611f5a841b926e33fbd
+      sentencepiece.bpe.model: cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865
+      special_tokens_map.json: 68171d1ff68b731a33d119708476692c094a466b
+      tokenizer.json: 9eb652ac4e40cc093272bbbe0f55d521cf67570060227109b5cdc20945a4489e
+      tokenizer_config.json: 059214673d9d6d2ee319411e2ffec8c024b816d5

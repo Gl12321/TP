@@ -1,0 +1,11 @@
+select ::= "SELECT" sp ("DISTINCT" sp)? select-list sp "FROM" sp source join-clause* where-clause? group-clause? having-clause? order-clause? limit-clause? offset-clause?
+select-list ::= select-item (ws "," ws select-item)*
+select-item ::= "*" | source-star | value (sp "AS" sp output-name)?
+join-clause ::= sp ("JOIN" | "INNER JOIN" | "LEFT JOIN") sp source sp "ON" sp condition
+where-clause ::= sp "WHERE" sp condition
+group-clause ::= sp "GROUP BY" sp scalar (ws "," ws scalar)*
+having-clause ::= sp "HAVING" sp value-condition
+order-clause ::= sp "ORDER BY" sp order-item (ws "," ws order-item)*
+order-item ::= (value | output-name) (sp ("ASC" | "DESC"))? (sp "NULLS" sp ("FIRST" | "LAST"))?
+limit-clause ::= sp "LIMIT" sp integer
+offset-clause ::= sp "OFFSET" sp integer

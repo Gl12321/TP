@@ -1,0 +1,25 @@
+scalar ::= scalar-product (ws add-op ws scalar-product)*
+scalar-product ::= scalar-unary (ws mul-op ws scalar-unary)*
+scalar-unary ::= "-"? scalar-primary
+scalar-primary ::= column | atom-literal | "(" ws scalar ws ")" | scalar-function | scalar-case | date-function | "CURRENT_DATE"
+scalar-function ::= "COALESCE(" ws scalar ws "," ws scalar (ws "," ws scalar)* ws ")" | "NULLIF(" ws scalar ws "," ws scalar ws ")"
+scalar-case ::= "CASE" (sp "WHEN" sp condition sp "THEN" sp scalar)+ (sp "ELSE" sp scalar)? sp "END"
+date-function ::= "DATE_TRUNC(" ws date-unit ws "," ws scalar ws ")" | "EXTRACT(" ws extract-unit sp "FROM" sp scalar ws ")"
+
+value ::= value-product (ws add-op ws value-product)*
+value-product ::= value-unary (ws mul-op ws value-unary)*
+value-unary ::= "-"? value-primary
+value-primary ::= column | atom-literal | "(" ws value ws ")" | aggregate | value-function | value-case | date-function | "CURRENT_DATE"
+value-function ::= "COALESCE(" ws value ws "," ws value (ws "," ws value)* ws ")" | "NULLIF(" ws value ws "," ws value ws ")"
+value-case ::= "CASE" (sp "WHEN" sp value-condition sp "THEN" sp value)+ (sp "ELSE" sp value)? sp "END"
+aggregate ::= "COUNT(" ws ("*" | ("DISTINCT" sp)? scalar) ws ")" | ("SUM(" | "AVG(" | "MIN(" | "MAX(") ws scalar ws ")"
+
+condition ::= conjunction (sp "OR" sp conjunction)*
+conjunction ::= negation (sp "AND" sp negation)*
+negation ::= ("NOT" sp)* predicate
+predicate ::= "(" ws condition ws ")" | boolean | scalar ws comparison ws scalar | scalar sp "IS" sp ("NOT" sp)? ("NULL" | boolean) | scalar sp ("NOT" sp)? ("LIKE" | "ILIKE") sp scalar | scalar sp ("NOT" sp)? "IN" ws "(" ws literal (ws "," ws literal)* ws ")" | scalar sp ("NOT" sp)? "BETWEEN" sp scalar sp "AND" sp scalar
+
+value-condition ::= value-conjunction (sp "OR" sp value-conjunction)*
+value-conjunction ::= value-negation (sp "AND" sp value-negation)*
+value-negation ::= ("NOT" sp)* value-predicate
+value-predicate ::= "(" ws value-condition ws ")" | boolean | value ws comparison ws value | value sp "IS" sp ("NOT" sp)? ("NULL" | boolean) | value sp ("NOT" sp)? ("LIKE" | "ILIKE") sp value | value sp ("NOT" sp)? "IN" ws "(" ws literal (ws "," ws literal)* ws ")" | value sp ("NOT" sp)? "BETWEEN" sp value sp "AND" sp value

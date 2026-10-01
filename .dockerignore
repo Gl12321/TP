@@ -1,0 +1,17 @@
+models/
+data/
+.tools/
+.runtime/
+.agents/
+.codex/
+
+**/__pycache__/
+*.pyc
+venv/
+.env
+.pytest_cache/
+
+.git
+tests/
+
+.DS_Store
