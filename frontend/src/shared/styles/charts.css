@@ -1,0 +1,238 @@
+.result-question {
+  margin: 0;
+  padding: 0 21px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.result-scope {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 0 21px 15px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.result-scope > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.result-scope > a {
+  background: #f0f4fc;
+  color: #365f9c;
+  border-radius: 5px;
+  padding: 4px 7px;
+}
+.result-view-switch {
+  margin: 0 20px 15px;
+  width: fit-content;
+}
+.result-chart {
+  padding: 4px 21px 17px;
+}
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.chart-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.chart-controls select {
+  font-size: 11px;
+  min-height: 36px;
+}
+.chart-canvas {
+  margin-top: 15px;
+  overflow-x: auto;
+}
+.chart-canvas svg {
+  display: block;
+  width: 100%;
+  min-width: 550px;
+}
+.chart-grid {
+  stroke: #e5ebf3;
+  stroke-width: 1;
+}
+.chart-zero {
+  stroke: #a7b7cb;
+  stroke-width: 1;
+}
+.chart-axis {
+  fill: #6c7d91;
+  font-size: 10px;
+  font-family: inherit;
+}
+.chart-bar {
+  fill: #285bd7;
+  rx: 3px;
+}
+.chart-bar.negative {
+  fill: #bc4960;
+}
+.chart-line {
+  fill: none;
+  stroke: #285bd7;
+  stroke-width: 2.5;
+}
+.chart-point {
+  fill: #285bd7;
+  stroke: white;
+  stroke-width: 1.5;
+}
+.chart-note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 10px 0 0;
+}
+.table-cell-subtitle {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.measurement-change {
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 12px;
+  background: #f0f4fc;
+  border-radius: 7px;
+  color: #536b86;
+}
+.measurement-list {
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.measurement-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.measurement-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+.measurement-card h3 {
+  margin: 4px 0;
+}
+.measurement-card header p {
+  font-size: 12px;
+  margin: 4px 0;
+  color: var(--muted);
+}
+.measurement-card time {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.measurement-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 20px 0;
+}
+.measurement-values dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.measurement-values dd {
+  margin: 5px 0 0;
+  font-size: 21px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.measurement-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.measurement-definition {
+  margin-top: 15px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.measurement-definition summary {
+  cursor: pointer;
+}
+.report-history {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 22px;
+  margin-top: 24px;
+}
+.report-history-list {
+  align-self: start;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.report-history-list h2 {
+  font-size: 13px;
+  margin: 8px 10px;
+}
+.report-history-list button {
+  padding: 12px;
+  text-align: left;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+}
+.report-history-list button.active {
+  background: #edf3ff;
+  color: #285bd7;
+}
+.report-history-list button span {
+  display: block;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.report-history-list button strong {
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .report-history {
+    grid-template-columns: 1fr;
+  }
+  .report-history-list {
+    max-height: 230px;
+    overflow-y: auto;
+  }
+}
+@media (max-width: 600px) {
+  .measurement-list {
+    padding: 0 15px 15px;
+  }
+  .measurement-card {
+    padding: 15px;
+  }
+  .measurement-card header {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .chart-controls {
+    gap: 8px;
+  }
+  .chart-controls label {
+    flex-basis: 120px;
+  }
+}

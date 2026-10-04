@@ -11,6 +11,16 @@ venv/
 .ruff_cache/
 .coverage
 htmlcov/
+node_modules/
+dist/
+build/
+*.egg-info/
+playwright-report/
+test-results/
+.vite/
+razbor.db
+razbor.db-shm
+razbor.db-wal
 .idea/
 .agents/
 .codex/

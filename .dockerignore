@@ -6,12 +6,20 @@ data/
 .codex/
 
 **/__pycache__/
+**/node_modules/
+**/dist/
+**/build/
+**/*.egg-info/
+**/test-results/
+**/playwright-report/
 *.pyc
 venv/
 .env
+.env.*
 .pytest_cache/
 
 .git
 tests/
+docs/prototypes/
 
 .DS_Store

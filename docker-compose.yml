@@ -1,18 +1,16 @@
-x-database: &database
-  DB_HOST: db
-  DB_PORT: "5432"
-  DB_NAME: ${DB_NAME:?Use python run.py}
-  DB_USER: ${DB_USER:?Use python run.py}
-  DB_PASSWORD: ${DB_PASSWORD:?Use python run.py}
-  DB_READ_USER: ${DB_READ_USER:?Use python run.py}
-  DB_READ_PASSWORD: ${DB_READ_PASSWORD:?Use python run.py}
+x-application: &application
+  APP_DATABASE_URL: postgresql+asyncpg://${APP_DB_USER:?Use python run.py}:${APP_DB_PASSWORD:?Use python run.py}@db:5432/${APP_DB_NAME:?Use python run.py}
+  APP_SECRET_KEY: ${APP_SECRET_KEY:?Use python run.py}
+  APP_BOOTSTRAP_TOKEN: ${APP_BOOTSTRAP_TOKEN:?Use python run.py}
+  APP_CONFIG_PATH: /app/config.yaml
+  MODEL_PRESET: ${MODEL_PRESET:-}
 
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER:?Use python run.py}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Use python run.py}
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -21,8 +19,23 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
-    mem_limit: 512m
-    restart: "no"
+    mem_limit: 768m
+    restart: unless-stopped
+
+  bootstrap-db:
+    build:
+      context: .
+      target: prepare
+    profiles: [tools]
+    entrypoint: ["python", "-m", "runtime.database"]
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_NAME: ${APP_DB_NAME}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
 
   prepare:
     build:
@@ -30,11 +43,20 @@ services:
       target: prepare
     profiles: [tools]
     environment:
-      <<: *database
       MODEL_PRESET: ${MODEL_PRESET:-}
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
       - ./models:/app/models
+      - ./config.yaml:/app/config.yaml:ro
+
+  migrate:
+    build:
+      context: .
+      target: backend
+    profiles: [tools]
+    entrypoint: ["python", "-m", "backend.app.bootstrap", "migrate"]
+    environment: *application
+    volumes:
       - ./config.yaml:/app/config.yaml:ro
 
   api:
@@ -44,50 +66,49 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      <<: *database
-      MODEL_PRESET: ${MODEL_PRESET:-}
-      API_TOKEN: ${API_TOKEN}
-      HF_HUB_OFFLINE: "1"
-      TRANSFORMERS_OFFLINE: "1"
-      ANONYMIZED_TELEMETRY: "False"
-    volumes:
-      - ./models:/app/models:ro
-      - ./data:/app/data
-      - ./config.yaml:/app/config.yaml:ro
-    ports:
-      - "127.0.0.1:8000:8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3).close()"]
-      interval: 5s
-      timeout: 5s
-      start_period: 10m
-      retries: 6
-    stop_grace_period: 45s
-    restart: "no"
-
-  ui:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    depends_on:
-      api:
-        condition: service_healthy
-    environment:
-      API_URL: http://api:8000
-      API_TOKEN: ${API_TOKEN}
-      SQL_AGENT_CONFIG: /app/config.yaml
+    environment: *application
     volumes:
       - ./config.yaml:/app/config.yaml:ro
     ports:
-      - "127.0.0.1:8501:8501"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8000}:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3).close()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=3).close()"]
       interval: 5s
       timeout: 5s
+      start_period: 20s
       retries: 12
     mem_limit: 768m
-    restart: "no"
+    init: true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      target: worker
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *application
+      APP_INDEX_DIR: /app/data/indexes
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    volumes:
+      - ./models:/app/models:ro
+      - agent_data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "python", "-m", "backend.app.worker", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10m
+      retries: 4
+    init: true
+    stop_grace_period: 60s
+    restart: "on-failure:3"
 
 volumes:
   postgres_data:
+  agent_data:

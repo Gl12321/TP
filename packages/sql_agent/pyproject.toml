@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "razbor-sql-agent"
+version = "0.1.0"
+description = "Constrained PostgreSQL analytics from natural-language questions"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["sqlglot==28.10.1"]
+
+[project.optional-dependencies]
+local = [
+    "llama-cpp-python==0.3.35",
+    "Jinja2==3.1.6",
+    "psutil==7.2.2",
+    "torch==2.9.1",
+    "transformers==4.57.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"sql_agent.sql.grammar" = ["*.gbnf"]

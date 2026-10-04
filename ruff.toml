@@ -1,0 +1,6 @@
+target-version = "py311"
+line-length = 100
+extend-exclude = [".tools", ".runtime", "docs", "frontend", "build"]
+
+[lint]
+select = ["F", "E9"]

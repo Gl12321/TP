@@ -1,0 +1,361 @@
+{
+  "scope": "Synthetic SQLite in-memory and Python experiments; no LLM or PostgreSQL execution.",
+  "python": "3.12.10",
+  "sqlite": "3.49.1",
+  "mutation_matrix": {
+    "baseline": {
+      "expected_cents": 30000,
+      "values_cents": {
+        "correct": 30000,
+        "missing_required_status": 30000,
+        "join_items": 30000,
+        "sum_distinct_amount": 30000,
+        "inner_customer": 30000
+      },
+      "incorrect": []
+    },
+    "unpaid_order": {
+      "expected_cents": 30000,
+      "values_cents": {
+        "correct": 30000,
+        "missing_required_status": 35000,
+        "join_items": 30000,
+        "sum_distinct_amount": 30000,
+        "inner_customer": 30000
+      },
+      "incorrect": [
+        "missing_required_status"
+      ]
+    },
+    "second_item": {
+      "expected_cents": 30000,
+      "values_cents": {
+        "correct": 30000,
+        "missing_required_status": 30000,
+        "join_items": 40000,
+        "sum_distinct_amount": 30000,
+        "inner_customer": 30000
+      },
+      "incorrect": [
+        "join_items"
+      ]
+    },
+    "same_amount_different_order": {
+      "expected_cents": 20000,
+      "values_cents": {
+        "correct": 20000,
+        "missing_required_status": 20000,
+        "join_items": 20000,
+        "sum_distinct_amount": 10000,
+        "inner_customer": 20000
+      },
+      "incorrect": [
+        "sum_distinct_amount"
+      ]
+    },
+    "unknown_customer": {
+      "expected_cents": 35000,
+      "values_cents": {
+        "correct": 35000,
+        "missing_required_status": 35000,
+        "join_items": 35000,
+        "sum_distinct_amount": 35000,
+        "inner_customer": 30000
+      },
+      "incorrect": [
+        "inner_customer"
+      ]
+    }
+  },
+  "unsupported_plans": {
+    "rejected": {
+      "order_amount_by_item_category": "unsupported_dimension_or_allocation",
+      "unknown_metric": "unknown_metric",
+      "stale_definition": "catalog_version_changed",
+      "unknown_cardinality": "unknown_join_cardinality",
+      "one_period_boundary": "incomplete_period",
+      "invalid_period": "invalid_period",
+      "unknown_filter_slot": "rejected_not_silently_dropped"
+    },
+    "bound_filter_literal": {
+      "plan": {
+        "metric": "paid_revenue",
+        "group_by": null,
+        "country": "RU' OR 1=1 --",
+        "start": null,
+        "end": null,
+        "date_basis": "paid_on",
+        "catalog_version": 1
+      },
+      "plan_id": "60c99a16a49f4fda",
+      "sql": "SELECT NULL AS dimension, SUM(o.\"amount_cents\") AS amount_sum, COUNT(*) AS entity_count, COUNT(o.\"amount_cents\") AS known_amount_count FROM \"orders\" AS o LEFT JOIN \"customers\" AS c ON o.\"customer_id\" = c.\"id\" WHERE o.\"status\" = :required_status AND c.\"country\" = :country",
+      "parameters": {
+        "required_status": "paid",
+        "country": "RU' OR 1=1 --"
+      },
+      "rows": [
+        {
+          "dimension": null,
+          "value": null,
+          "status": "no_matching_rows",
+          "entity_count": 0,
+          "known_amount_count": 0,
+          "missing_amount_count": 0
+        }
+      ]
+    }
+  },
+  "non_additive": {
+    "order_total_cents": 110000,
+    "order_totals_touching_each_category_cents": [
+      [
+        "A",
+        110000
+      ],
+      [
+        "B",
+        10000
+      ]
+    ],
+    "sum_of_nonexclusive_categories_cents": 120000,
+    "monthly_averages_cents": [
+      {
+        "dimension": "2026-01",
+        "value": "10000",
+        "status": "complete",
+        "entity_count": 2,
+        "known_amount_count": 2,
+        "missing_amount_count": 0
+      },
+      {
+        "dimension": "2026-02",
+        "value": "90000",
+        "status": "complete",
+        "entity_count": 1,
+        "known_amount_count": 1,
+        "missing_amount_count": 0
+      }
+    ],
+    "incorrect_mean_of_monthly_averages_cents": "50000",
+    "correct_total_average_cents": "36666.66666666666666666666667",
+    "reconciliation_is_not_sufficient": {
+      "category_values_cents": [
+        [
+          "A",
+          10000
+        ],
+        [
+          "B",
+          10000
+        ]
+      ],
+      "total_cents": 20000,
+      "represented_order_ids": 1,
+      "actual_order_ids": 2,
+      "limitation": "Duplicating one order and dropping another can accidentally preserve the grand total."
+    }
+  },
+  "null_states": {
+    "empty": {
+      "raw_sum_avg_count_all_count_known": [
+        null,
+        null,
+        0,
+        0
+      ],
+      "checked_revenue": [
+        {
+          "dimension": null,
+          "value": null,
+          "status": "no_matching_rows",
+          "entity_count": 0,
+          "known_amount_count": 0,
+          "missing_amount_count": 0
+        }
+      ],
+      "checked_count": [
+        {
+          "dimension": null,
+          "value": "0",
+          "status": "complete",
+          "entity_count": 0,
+          "known_amount_count": 0,
+          "missing_amount_count": 0
+        }
+      ]
+    },
+    "all_unknown": {
+      "raw_sum_avg_count_all_count_known": [
+        null,
+        null,
+        2,
+        0
+      ],
+      "checked_revenue": [
+        {
+          "dimension": null,
+          "value": null,
+          "status": "incomplete_amounts",
+          "entity_count": 2,
+          "known_amount_count": 0,
+          "missing_amount_count": 2
+        }
+      ],
+      "checked_count": [
+        {
+          "dimension": null,
+          "value": "2",
+          "status": "complete",
+          "entity_count": 2,
+          "known_amount_count": 0,
+          "missing_amount_count": 2
+        }
+      ]
+    },
+    "partly_unknown": {
+      "raw_sum_avg_count_all_count_known": [
+        10000,
+        10000.0,
+        2,
+        1
+      ],
+      "checked_revenue": [
+        {
+          "dimension": null,
+          "value": null,
+          "status": "incomplete_amounts",
+          "entity_count": 2,
+          "known_amount_count": 1,
+          "missing_amount_count": 1
+        }
+      ],
+      "checked_count": [
+        {
+          "dimension": null,
+          "value": "2",
+          "status": "complete",
+          "entity_count": 2,
+          "known_amount_count": 1,
+          "missing_amount_count": 1
+        }
+      ]
+    },
+    "known_zero": {
+      "raw_sum_avg_count_all_count_known": [
+        0,
+        0.0,
+        2,
+        2
+      ],
+      "checked_revenue": [
+        {
+          "dimension": null,
+          "value": "0",
+          "status": "complete",
+          "entity_count": 2,
+          "known_amount_count": 2,
+          "missing_amount_count": 0
+        }
+      ],
+      "checked_count": [
+        {
+          "dimension": null,
+          "value": "2",
+          "status": "complete",
+          "entity_count": 2,
+          "known_amount_count": 2,
+          "missing_amount_count": 0
+        }
+      ]
+    }
+  },
+  "clarification": {
+    "coinciding_dates": {
+      "created_on": "30000",
+      "paid_on": "30000"
+    },
+    "late_payment": {
+      "created_on": "35000",
+      "paid_on": "30000"
+    },
+    "plan_patch": {
+      "date_basis": [
+        "paid_on",
+        "created_on"
+      ]
+    },
+    "previous_month_at_same_instant": {
+      "as_of": "2026-03-01T00:30:00+03:00",
+      "UTC": [
+        "2026-01-01",
+        "2026-02-01"
+      ],
+      "fixed_UTC_plus_3": [
+        "2026-02-01",
+        "2026-03-01"
+      ]
+    }
+  },
+  "randomized_plans": {
+    "seed": 739021,
+    "fixtures": 60,
+    "plan_result_comparisons": 360
+  },
+  "counter_review": {
+    "missing_date_hidden_by_range_filter": {
+      "prototype_result": {
+        "plan": {
+          "metric": "paid_revenue",
+          "group_by": null,
+          "country": null,
+          "start": "2026-01-01",
+          "end": "2026-02-01",
+          "date_basis": "paid_on",
+          "catalog_version": 1
+        },
+        "plan_id": "a977b06e6a12e080",
+        "sql": "SELECT NULL AS dimension, SUM(o.\"amount_cents\") AS amount_sum, COUNT(*) AS entity_count, COUNT(o.\"amount_cents\") AS known_amount_count FROM \"orders\" AS o WHERE o.\"status\" = :required_status AND o.\"paid_on\" >= :start AND o.\"paid_on\" < :end",
+        "parameters": {
+          "required_status": "paid",
+          "start": "2026-01-01",
+          "end": "2026-02-01"
+        },
+        "rows": [
+          {
+            "dimension": null,
+            "value": "30000",
+            "status": "complete",
+            "entity_count": 2,
+            "known_amount_count": 2,
+            "missing_amount_count": 0
+          }
+        ]
+      },
+      "paid_orders_without_date": 1,
+      "limitation": "Complete here means amount completeness inside selected rows; population completeness is not proved."
+    },
+    "natural_language_omission": {
+      "question": "Paid revenue by country excluding refunds",
+      "plan_accepted": {
+        "metric": "paid_revenue",
+        "group_by": "country",
+        "country": null,
+        "start": null,
+        "end": null,
+        "date_basis": "paid_on",
+        "catalog_version": 1
+      },
+      "limitation": "A valid plan does not prove that the natural-language requirement about refunds was represented."
+    },
+    "snapshot_identity": {
+      "limitation": "The prototype plan hash has no data revision; equal plan IDs do not identify equal results."
+    }
+  },
+  "current_validator": {
+    "grammar_accepted": true,
+    "ast_accepted": true,
+    "actual_cents": 40000,
+    "expected_cents": 30000,
+    "normalized_sql": "SELECT SUM(\"t1\".\"amount_cents\") FROM \"main\".\"orders\" AS \"t1\" JOIN \"main\".\"items\" AS \"t0\" ON \"t1\".\"id\" = \"t0\".\"order_id\" WHERE \"t1\".\"status\" = 'paid'"
+  }
+}

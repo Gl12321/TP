@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "razbor-backend"
+version = "0.1.0"
+description = "Workspace analytics, durable SQL jobs and evidence-based collaboration"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["backend", "backend.app", "backend.app.*"]
+

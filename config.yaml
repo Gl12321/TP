@@ -1,7 +1,13 @@
-model: qwen3-8b
-
+model: qwen3.5-9b
+application:
+  source_hosts: []
+  secure_cookies: false
+  allowed_origins:
+  - http://localhost:8000
+  - http://127.0.0.1:8000
+  session_ttl_seconds: 43200
+  job_lease_seconds: 90
 settings:
-  MAX_UPLOAD_BYTES: 268435456
   MAX_RESULT_ROWS: 1000
   MAX_RESULT_BYTES: 4194304
   SQL_TIMEOUT_MS: 30000
@@ -11,39 +17,37 @@ settings:
   MAX_CORRECTIONS: 3
   RETRIEVAL_TOP_K: 10
   CONTEXT_MAX_TABLES: 12
-  EMBEDDING_BATCH_SIZE: 8
-  RERANKER_BATCH_SIZE: 8
-  EVENT_QUEUE_SIZE: 64
-
+  EMBEDDING_BATCH_SIZE: 4
+  RERANKER_BATCH_SIZE: 4
+  MAX_QUEUED_JOBS: 32
+  MAX_QUEUED_JOBS_PER_WORKSPACE: 8
+  MAX_QUEUED_JOBS_PER_USER: 2
 generation:
   temperature: 0.0
   max_tokens: 512
-  n_ctx: 8192
-  n_batch: 256
+  n_ctx: 4096
+  n_batch: 128
   n_ubatch: 128
   n_gpu_layers: 0
   n_threads: null
   n_threads_batch: null
   use_mmap: true
   verbose: false
-
 models:
-  qwen3-8b:
-    label: Qwen3 8B, Q4_K_M
-    repo_id: Qwen/Qwen3-8B-GGUF
-    revision: 7c41481f57cb95916b40956ab2f0b139b296d974
-    filename: Qwen3-8B-Q4_K_M.gguf
-    size_bytes: 5027783488
-    sha256: d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785
-  qwen3-14b:
-    label: Qwen3 14B, Q4_K_M
-    repo_id: Qwen/Qwen3-14B-GGUF
-    revision: 530227a7d994db8eca5ab5ced2fb692b614357fd
-    filename: Qwen3-14B-Q4_K_M.gguf
-    size_bytes: 9001752960
-    sha256: 500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0
-    params:
-      n_ctx: 4096
+  qwen3.5-4b:
+    label: Qwen3.5 4B, Q5_K_M
+    repo_id: unsloth/Qwen3.5-4B-GGUF
+    revision: e87f176479d0855a907a41277aca2f8ee7a09523
+    filename: Qwen3.5-4B-Q5_K_M.gguf
+    size_bytes: 3143656608
+    sha256: 8814232b85594dcd46c50e5b8b29324a7efe9e746edbe8a3d1df3d3fce7aad39
+  qwen3.5-9b:
+    label: Qwen3.5 9B, Q5_K_M
+    repo_id: unsloth/Qwen3.5-9B-GGUF
+    revision: 3885219b6810b007914f3a7950a8d1b469d598a5
+    filename: Qwen3.5-9B-Q5_K_M.gguf
+    size_bytes: 6577841376
+    sha256: dc2a39aef291f91a9116ad214058da0d86eb648743a124bd8c333787c4b9c91c
   qwen3.5-27b:
     label: Qwen3.5 27B, Q3_K_M
     repo_id: unsloth/Qwen3.5-27B-GGUF
@@ -54,31 +58,34 @@ models:
     params:
       n_ctx: 4096
       n_batch: 128
-
 retrieval_models:
   embedder:
-    repo_id: BAAI/bge-m3
-    revision: 5617a9f61b028005a4858fdac845db406aefb181
-    max_length: 1024
+    adapter: e5
+    repo_id: intfloat/multilingual-e5-small
+    revision: 614241f622f53c4eeff9890bdc4f31cfecc418b3
+    max_length: 512
+    query_prefix: 'query: '
+    passage_prefix: 'passage: '
+    dimension: 384
+    normalize: true
     files:
-      config.json: e6eda1c72da8f9dc30fdd9b69c73d35af3b7a7ad
-      config_sentence_transformers.json: 1fba91c78a6c8e17227058ab6d4d3acb5d8630a9
-      modules.json: 952a9b81c0bfd99800fabf352f69c7ccd46c5e43
-      sentence_bert_config.json: 0140ba1eac83a3c9b857d64baba91969d988624b
-      1_Pooling/config.json: 9bd85925f325e25246d94c4918dc02ab98f2a1b7
-      pytorch_model.bin: b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38
+      1_Pooling/config.json: acbd4014202bf4dbc6c03229bcbeef7c4feafb58
+      config.json: 60a2a84020f1d74cc53ea9e8c4e91cf4af6c2b68
+      model.safetensors: 1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477
+      modules.json: ac2039abdf6ff023b27c919bb9675cfe378cb10f
+      sentence_bert_config.json: 4eca68d85ecd3034cf4174d8a4033a75344ea62d
       sentencepiece.bpe.model: cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865
-      special_tokens_map.json: b1879d702821e753ffe4245048eee415d54a9385
-      tokenizer.json: 21106b6d7dab2952c1d496fb21d5dc9db75c28ed361a05f5020bbba27810dd08
-      tokenizer_config.json: dc69ac559dcba2694012009aaa108c614541789a
+      special_tokens_map.json: e0b1d18ecd0ae4ff1d47bd297d910c0cf83e504b
+      tokenizer.json: 0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39
+      tokenizer_config.json: 059214673d9d6d2ee319411e2ffec8c024b816d5
   reranker:
-    repo_id: BAAI/bge-reranker-base
-    revision: 2cfc18c9415c912f9d8155881c133215df768a70
+    repo_id: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+    revision: 1427fd652930e4ba29e8149678df786c240d8825
     max_length: 512
     files:
-      config.json: ff248a5f7d76e27b10778b3c593c9fba1df4c448
-      model.safetensors: ced967c45fd1902eb92716c9ceeca7c95a936770ea9db611f5a841b926e33fbd
+      config.json: 43ac97f1bef372d4f1d30a32f9a84baffcf6575d
+      model.safetensors: 5daeca2481a76b5976a2bdc32f0a78532b6716da4f8cd3ff59460ef8d2f359b4
       sentencepiece.bpe.model: cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865
-      special_tokens_map.json: 68171d1ff68b731a33d119708476692c094a466b
-      tokenizer.json: 9eb652ac4e40cc093272bbbe0f55d521cf67570060227109b5cdc20945a4489e
-      tokenizer_config.json: 059214673d9d6d2ee319411e2ffec8c024b816d5
+      special_tokens_map.json: 2ea7ad0e45a9d1d1591782ba7e29a703d0758831
+      tokenizer.json: 62c24cdc13d4c9952d63718d6c9fa4c287974249e16b7ade6d5a85e7bbb75626
+      tokenizer_config.json: b59159d44c6bd4b1d9f7ae4f8da028da4238e06e

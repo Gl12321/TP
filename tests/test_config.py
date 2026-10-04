@@ -7,16 +7,14 @@ import unittest
 from unittest.mock import patch
 
 
-AVAILABLE = all(importlib.util.find_spec(name) for name in ("yaml", "pydantic_settings"))
+AVAILABLE = importlib.util.find_spec("yaml") is not None
 
 
-@unittest.skipUnless(AVAILABLE, "Нужны PyYAML и pydantic-settings")
+@unittest.skipUnless(AVAILABLE, "Нужен PyYAML")
 class ConfigTests(unittest.TestCase):
     def setUp(self):
-        from src.core.config import Settings
-        from src.core.presets import load_config, resolve_models
+        from runtime.config import load_config, resolve_models
 
-        self.Settings = Settings
         self.load_config = load_config
         self.resolve_models = resolve_models
         self.config = load_config()
@@ -24,52 +22,61 @@ class ConfigTests(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
-    def settings(self, **values):
-        return self.Settings(_env_file=None, DB_USER="importer", DB_PASSWORD="secret", DB_NAME="test", **values)
-
     def test_default_model_and_limits_come_from_yaml(self):
-        settings = self.settings()
-        self.assertEqual(settings.MODEL_PRESET, self.config["model"])
-        self.assertEqual(settings.LLM_TIMEOUT_SECONDS, self.config["settings"]["LLM_TIMEOUT_SECONDS"])
-        self.assertEqual(settings.MODELS["llm"]["repo_id"], self.config["models"][settings.MODEL_PRESET]["repo_id"])
+        models = self.resolve_models(self.config, self.config["model"])
+        self.assertEqual(
+            models["llm"]["repo_id"], self.config["models"][self.config["model"]]["repo_id"]
+        )
+        self.assertEqual(set(self.config["models"]), {"qwen3.5-4b", "qwen3.5-9b", "qwen3.5-27b"})
 
     def test_empty_compose_model_uses_yaml_default(self):
-        with patch.dict(os.environ, {"MODEL_PRESET": ""}):
-            self.assertEqual(self.settings().MODEL_PRESET, self.config["model"])
+        from runtime.prepare import main
 
-    def test_environment_selects_model_and_overrides_limit(self):
-        with patch.dict(os.environ, {"MODEL_PRESET": "qwen3.5-27b", "MAX_RESULT_ROWS": "17"}):
-            settings = self.settings()
-        self.assertEqual(settings.MODELS["llm"]["params"]["n_ctx"], 4096)
-        self.assertEqual(settings.MAX_RESULT_ROWS, 17)
-        self.assertGreater(settings.MODELS["llm"]["params"]["n_threads"], 0)
+        with (
+            patch.dict(os.environ, {"MODEL_PRESET": ""}),
+            patch("runtime.prepare.ensure_models") as prepare,
+        ):
+            self.assertEqual(main([]), 0)
+        self.assertEqual(
+            prepare.call_args.args[0]["llm"]["repo_id"],
+            self.config["models"][self.config["model"]]["repo_id"],
+        )
+
+    def test_environment_selects_model_without_downloading_during_preflight(self):
+        from runtime.prepare import main
+
+        with (
+            patch.dict(os.environ, {"MODEL_PRESET": "qwen3.5-27b"}),
+            patch("runtime.prepare.ensure_models") as prepare,
+        ):
+            self.assertEqual(main(["--check"]), 0)
+        prepare.assert_not_called()
+        models = self.resolve_models(self.config, "qwen3.5-27b")
+        self.assertEqual(models["llm"]["params"]["n_ctx"], 4096)
+        self.assertGreater(models["llm"]["params"]["n_threads"], 0)
 
     def test_unknown_model_fails_with_available_names(self):
-        with self.assertRaisesRegex(ValueError, "qwen3-8b"):
-            self.settings(MODEL_PRESET="missing")
-
-    def test_nonpositive_limit_fails_before_model_loading(self):
-        with self.assertRaises(ValueError):
-            self.settings(MAX_RESULT_ROWS=0)
-
-    def test_unknown_yaml_setting_is_rejected(self):
-        config = deepcopy(self.config)
-        config["settings"]["MISSPELLED_LIMIT"] = 1
-        with patch("src.core.config.load_config", return_value=config), self.assertRaisesRegex(ValueError, "MISSPELLED_LIMIT"):
-            self.settings()
+        with self.assertRaisesRegex(ValueError, "qwen3.5-4b"):
+            self.resolve_models(self.config, "missing")
 
     def test_invalid_generation_settings_fail_during_preflight(self):
-        for changes in ({"n_ctx": -1}, {"max_tokens": 8192}, {"n_batch": 9000},
-                        {"temperature": float("nan")}, {"n_ubatch": 1024}, {"n_gpu_layers": -2}):
+        for changes in (
+            {"n_ctx": -1},
+            {"max_tokens": 8192},
+            {"n_batch": 9000},
+            {"temperature": float("nan")},
+            {"n_ubatch": 1024},
+            {"n_gpu_layers": -2},
+        ):
             config = deepcopy(self.config)
             config["generation"].update(changes)
             with self.subTest(changes=changes), self.assertRaises(ValueError):
-                self.resolve_models(config, "qwen3-8b")
+                self.resolve_models(config, "qwen3.5-4b")
 
     def test_model_paths_are_relative_to_project_not_working_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            models = self.resolve_models(self.config, "qwen3-8b", root)
+            models = self.resolve_models(self.config, "qwen3.5-4b", root)
         self.assertEqual(Path(models["llm"]["params"]["model_path"]).parent, root / "models")
         self.assertEqual(Path(models["embedder"]["cache_path"]), root / "models" / "embedder")
 
@@ -77,21 +84,54 @@ class ConfigTests(unittest.TestCase):
         import yaml
 
         config = deepcopy(self.config)
-        config["models"]["qwen3-8b"]["sha256"] = "missing"
+        config["models"]["qwen3.5-4b"]["sha256"] = "missing"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.yaml"
             path.write_text(yaml.safe_dump(config), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "SHA-256"):
                 self.load_config(path)
 
+    def test_invalid_limits_fail_before_downloading_or_stopping_worker(self):
+        import yaml
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            for name, value in (
+                ("MIN_FREE_MEMORY_MB", -1),
+                ("EMBEDDING_BATCH_SIZE", 0),
+                ("MAX_CORRECTIONS", -1),
+                ("RERANKER_BATCH_SIZE", True),
+                ("LLM_TIMEOUT_SECONDS", "600"),
+            ):
+                config = deepcopy(self.config)
+                config["settings"][name] = value
+                path.write_text(yaml.safe_dump(config), encoding="utf-8")
+                with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
+                    self.load_config(path)
+            config["settings"] = {**self.config["settings"], "MAX_CORRECTIONS": 0}
+            path.write_text(yaml.safe_dump(config), encoding="utf-8")
+            self.assertEqual(self.load_config(path)["settings"]["MAX_CORRECTIONS"], 0)
+
     def test_invalid_retrieval_catalog_fails_before_downloading(self):
         import yaml
 
         changes = [
-            {"revision": "main"}, {"repo_id": "missing-owner"}, {"max_length": 0},
-            {"files": []}, {"files": {}}, {"files": {"config.json": "invalid"}},
-            *({"files": {name: "a" * 40}} for name in
-              ("../config.json", "/config.json", "C:/config.json", "a\\config.json", "a//config.json")),
+            {"revision": "main"},
+            {"repo_id": "missing-owner"},
+            {"max_length": 0},
+            {"files": []},
+            {"files": {}},
+            {"files": {"config.json": "invalid"}},
+            *(
+                {"files": {name: "a" * 40}}
+                for name in (
+                    "../config.json",
+                    "/config.json",
+                    "C:/config.json",
+                    "a\\config.json",
+                    "a//config.json",
+                )
+            ),
         ]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.yaml"

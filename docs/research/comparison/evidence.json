@@ -1,0 +1,146 @@
+{
+  "basis": "Synthetic inputs; exact rational arithmetic; no LLM, PostgreSQL or causal inference",
+  "revenue_comparison": {
+    "mode": "symmetric_two_factor",
+    "delta_cents": -900000,
+    "percentage": "-75/2",
+    "order_count_part_cents": "-550000",
+    "average_order_part_cents": "-350000"
+  },
+  "region_contributions": [
+    {
+      "kind": "segment",
+      "segment": "Saint Petersburg",
+      "delta_cents": -600000
+    },
+    {
+      "kind": "segment",
+      "segment": "Moscow",
+      "delta_cents": -300000
+    }
+  ],
+  "top_one_and_remainder": [
+    {
+      "kind": "segment",
+      "segment": "Saint Petersburg",
+      "delta_cents": -600000
+    },
+    {
+      "kind": "remainder",
+      "delta_cents": -300000,
+      "segments": 1
+    }
+  ],
+  "nullable_segments": [
+    {
+      "kind": "segment",
+      "segment": null,
+      "delta_cents": -100
+    },
+    {
+      "kind": "segment",
+      "segment": "other_segments",
+      "delta_cents": 100
+    }
+  ],
+  "real_remainder_like_name": [
+    {
+      "kind": "segment",
+      "segment": "other_segments",
+      "delta_cents": 100
+    },
+    {
+      "kind": "remainder",
+      "delta_cents": -100,
+      "segments": 1
+    }
+  ],
+  "order_dependent_decompositions": {
+    "count_first": [
+      "-600000",
+      "-300000"
+    ],
+    "average_first": [
+      "-500000",
+      "-400000"
+    ]
+  },
+  "simpson_counterexample": {
+    "before": {
+      "A": [
+        9,
+        10
+      ],
+      "B": [
+        20,
+        100
+      ]
+    },
+    "after": {
+      "A": [
+        80,
+        100
+      ],
+      "B": [
+        1,
+        10
+      ]
+    },
+    "overall_before": "29/110",
+    "overall_after": "81/110",
+    "every_segment_declines_but_total_rate_rises": true
+  },
+  "zero_start": {
+    "mode": "zero_order_period",
+    "delta_cents": 100000,
+    "percentage": null
+  },
+  "zero_end": {
+    "mode": "zero_order_period",
+    "delta_cents": -100000,
+    "percentage": "-100"
+  },
+  "negative_start": {
+    "mode": "symmetric_two_factor",
+    "delta_cents": 30000,
+    "percentage": null,
+    "order_count_part_cents": "0",
+    "average_order_part_cents": "30000"
+  },
+  "rejections": [
+    "incomplete_result",
+    "missing_amounts",
+    "inconsistent_order_count",
+    "incomplete_segments"
+  ],
+  "randomized_cases": 1000,
+  "checks": "exact additivity and reversal symmetry passed for every randomized case",
+  "project_sql": {
+    "grammar_recognizer": "accepted by current project GBNF",
+    "ast_validator": "accepted by current project SQLValidator",
+    "execution": "SQLite in-memory after SQLGlot dialect conversion; PostgreSQL not executed",
+    "sql": "SELECT t0.\"region\",\nSUM(CASE WHEN t0.\"paid_at\" < DATE '2026-06-01' THEN t0.\"amount_cents\" ELSE 0 END) AS \"before_cents\",\nSUM(CASE WHEN t0.\"paid_at\" >= DATE '2026-06-01' THEN t0.\"amount_cents\" ELSE 0 END) AS \"after_cents\",\nCOUNT(CASE WHEN t0.\"paid_at\" < DATE '2026-06-01' THEN 1 ELSE NULL END) AS \"before_orders\",\nCOUNT(CASE WHEN t0.\"paid_at\" >= DATE '2026-06-01' THEN 1 ELSE NULL END) AS \"after_orders\"\nFROM \"sales\".\"orders\" AS t0\nWHERE t0.\"status\" = 'paid' AND t0.\"currency\" = 'RUB'\nAND t0.\"paid_at\" >= DATE '2026-05-01' AND t0.\"paid_at\" < DATE '2026-07-01'\nGROUP BY t0.\"region\"\nORDER BY t0.\"region\"\n",
+    "rows": [
+      [
+        "Moscow",
+        1500000,
+        1200000,
+        10,
+        10
+      ],
+      [
+        "Saint Petersburg",
+        900000,
+        300000,
+        10,
+        5
+      ]
+    ],
+    "input_rows": 38,
+    "excluded_controls": [
+      "unpaid order",
+      "different currency",
+      "upper date boundary"
+    ]
+  }
+}
