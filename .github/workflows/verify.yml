@@ -90,7 +90,7 @@ jobs:
         run: python run.py --stop
 
   real-ai:
-    if: github.event_name == 'workflow_dispatch' && inputs.real_ai
+    if: (github.event_name == 'workflow_dispatch' && inputs.real_ai) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[real-ai]'))
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -102,7 +102,8 @@ jobs:
         with:
           path: models
           key: qwen35-4b-${{ runner.os }}-${{ hashFiles('config.yaml') }}
-      - run: python -c "from pathlib import Path; p=Path('config.yaml'); p.write_text(p.read_text().replace('source_hosts: []', 'source_hosts: [db]'))"
+      - run: |
+          python -c "from pathlib import Path; p=Path('config.yaml'); p.write_text(p.read_text().replace('source_hosts: []', 'source_hosts: [db]'))"
       - run: python run.py --model qwen3.5-4b
       - run: python tools/acceptance.py
       - if: failure()
