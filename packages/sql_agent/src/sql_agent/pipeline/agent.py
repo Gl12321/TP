@@ -14,7 +14,13 @@ from sql_agent.contracts import (
     TableRef,
 )
 from sql_agent.generation.prompts import build_messages
-from sql_agent.ports import AllowedCatalog, ReadOnlyExecutor, SQLGenerator
+from sql_agent.ports import (
+    AllowedCatalog,
+    ReadOnlyExecutor,
+    SQLGenerator,
+    TableRanker,
+    TableRetriever,
+)
 from sql_agent.retrieval.context import select_context
 from sql_agent.retrieval.serializer import serialize_table
 from sql_agent.sql.grammar import SQLGrammarBuilder
@@ -55,9 +61,9 @@ class SQLAgent:
         executor: ReadOnlyExecutor,
         *,
         settings: AgentSettings | None = None,
-        retriever=None,
-        reranker=None,
-    ):
+        retriever: TableRetriever | None = None,
+        reranker: TableRanker | None = None,
+    ) -> None:
         self.catalog = catalog
         self.generator = generator
         self.executor = executor

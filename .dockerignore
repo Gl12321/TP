@@ -17,9 +17,13 @@ venv/
 .env
 .env.*
 .pytest_cache/
+.ruff_cache/
+.venv/
+**/.pytest_cache/
+**/*.tsbuildinfo
 
 .git
 tests/
-docs/prototypes/
+docs/
 
 .DS_Store

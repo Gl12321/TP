@@ -48,8 +48,8 @@ class ConfigurationTests(unittest.TestCase):
             Settings(secret_key="short", bootstrap_token="token").validate()
 
     def test_passwords_are_not_silently_stripped(self):
-        from backend.app.access.schemas import Login
-        from backend.app.sources.schemas import SourceCreate
+        from backend.app.access.api.schemas import Login
+        from backend.app.sources.api.schemas import SourceCreate
 
         self.assertEqual(
             Login(email=" a@example.org ", password=" password ").password, " password "

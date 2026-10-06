@@ -49,6 +49,7 @@ export function dateTime(value: string | null | undefined) {
     : new Intl.DateTimeFormat("ru-RU", {
         day: "numeric",
         month: "short",
+        year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
       }).format(date);

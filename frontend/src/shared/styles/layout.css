@@ -16,6 +16,12 @@
   padding: 30px 18px 20px;
   z-index: 20;
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .brand {
   display: flex;
@@ -270,7 +276,7 @@
   margin: 0 auto;
   flex: 1;
 }
-.main-content:focus {
+.main-content[tabindex="-1"]:focus {
   outline: none;
 }
 .page-heading {
@@ -319,6 +325,7 @@
   align-items: start;
 }
 .mobile-menu,
+.mobile-nav-close,
 .mobile-scrim {
   display: none;
 }
@@ -332,9 +339,11 @@
   border-radius: 8px;
   z-index: 100;
   transform: translateY(-180%);
+  clip-path: inset(50%);
 }
 .skip-link:focus-visible {
   transform: translateY(0);
+  clip-path: none;
   color: white;
 }
 .auth-layout {
@@ -447,6 +456,14 @@
 .notification-item strong {
   font-size: 13px;
 }
+.notification-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.notification-item .inline-actions {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
 .notification-item p {
   font-size: 12px;
   color: var(--muted);
@@ -492,7 +509,15 @@
     visibility: hidden;
     transform: translateX(-100%);
     transition: transform 0.2s;
-    width: 250px;
+    width: min(280px, calc(100vw - 32px));
+  }
+  .sidebar-heading .brand {
+    padding-left: 8px;
+    padding-right: 0;
+  }
+  .sidebar .mobile-nav-close {
+    display: inline-flex;
+    flex-shrink: 0;
   }
   .nav-open .sidebar {
     visibility: visible;
@@ -539,6 +564,13 @@
   }
 }
 @media (max-width: 600px) {
+  .notification-item {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .notification-item .inline-actions {
+    align-self: flex-end;
+  }
   .main-content {
     padding: 24px 16px;
   }

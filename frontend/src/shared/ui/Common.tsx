@@ -1,6 +1,11 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { useRef } from "react";
-import type { ReactNode, FormEvent, ButtonHTMLAttributes } from "react";
+import { cloneElement, isValidElement, useId, useRef } from "react";
+import type {
+  ReactNode,
+  FormEvent,
+  ButtonHTMLAttributes,
+  HTMLAttributes,
+} from "react";
 import { Icon } from "./Icon";
 import type { IconName } from "./Icon";
 import { ApiError } from "../api/client";
@@ -23,6 +28,7 @@ export function Button({
       type="button"
       className={`button ${variant} ${className}`}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
     >
       {loading ? (
@@ -230,12 +236,26 @@ export function Field({
   children: ReactNode;
   className?: string;
 }) {
+  const generatedId = useId();
+  const control = isValidElement<HTMLAttributes<HTMLElement>>(children)
+    ? children
+    : null;
+  const id = control?.props.id ?? generatedId;
+  const hintId = `${generatedId}-hint`;
+  const describedBy = [control?.props["aria-describedby"], hint ? hintId : ""]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <label className={`field ${className}`}>
-      <span>{label}</span>
-      {children}
-      {hint && <small>{hint}</small>}
-    </label>
+    <div className={`field ${className}`}>
+      <label htmlFor={id}>{label}</label>
+      {control
+        ? cloneElement(control, {
+            id,
+            "aria-describedby": describedBy || undefined,
+          })
+        : children}
+      {hint && <small id={hintId}>{hint}</small>}
+    </div>
   );
 }
 
@@ -296,6 +316,7 @@ export function StatusBadge({
     "done",
     "answered",
     "complete",
+    "resolved",
     "ok",
   ].includes(status)
     ? "success"
@@ -308,6 +329,7 @@ export function StatusBadge({
             "needs_input",
             "waiting",
             "pending",
+            "in_progress",
           ].includes(status)
         ? "warning"
         : "neutral";

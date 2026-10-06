@@ -7,71 +7,18 @@ import {
   useNavigate,
   useParams,
 } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "./session";
 import { WorkspaceProvider, useWorkspace, workspaceStart } from "./workspace";
-import { get, post, workspacePath } from "../shared/api/client";
-import type {
-  Capability,
-  Notification,
-  Workspace,
-} from "../shared/api/contracts";
+import { get, workspacePath } from "../shared/api/client";
+import type { Notification, Workspace } from "../shared/api/contracts";
 import { keys } from "../shared/api/queries";
-import {
-  Button,
-  EmptyState,
-  ErrorState,
-  Loading,
-  Modal,
-  roleLabels,
-} from "../shared/ui/Common";
+import { EmptyState, ErrorState, roleLabels } from "../shared/ui/Common";
 import { Icon } from "../shared/ui/Icon";
-import type { IconName } from "../shared/ui/Icon";
-import { dateTime, initials } from "../shared/ui/format";
-
-const navigation: {
-  path: string;
-  label: string;
-  icon: IconName;
-  capability: Capability[];
-}[] = [
-  {
-    path: "overview",
-    label: "Обзор",
-    icon: "overview",
-    capability: ["analytics:read"],
-  },
-  {
-    path: "stores",
-    label: "Точки",
-    icon: "stores",
-    capability: ["analytics:read"],
-  },
-  {
-    path: "assistant",
-    label: "Ассистент",
-    icon: "assistant",
-    capability: ["assistant:use"],
-  },
-  {
-    path: "reports",
-    label: "Отчёты",
-    icon: "reports",
-    capability: ["analytics:read"],
-  },
-  {
-    path: "cases",
-    label: "Разборы",
-    icon: "cases",
-    capability: ["analytics:read"],
-  },
-  {
-    path: "data",
-    label: "Данные",
-    icon: "data",
-    capability: ["sources:manage", "analytics:read"],
-  },
-];
+import { initials } from "../shared/ui/format";
+import { NotificationDialog } from "./shell/components/NotificationDialog";
+import { useMobileNavigation } from "./shell/hooks/useMobileNavigation";
+import { navigation } from "./shell/model/navigation";
 
 export function AppShell() {
   const { session } = useSession();
@@ -117,12 +64,25 @@ function ShellContent({ workspace }: { workspace: Workspace }) {
   const { can } = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<Error | null>(null);
-  const main = useRef<HTMLElement>(null);
-  const sidebar = useRef<HTMLElement>(null);
-  const menuButton = useRef<HTMLButtonElement>(null);
+  const {
+    main,
+    sidebar,
+    menuButton,
+    mobileViewport,
+    drawerOpen,
+    openNavigation,
+    closeNavigation,
+    navigateFromSidebar,
+  } = useMobileNavigation(location.pathname);
+  const scopeParams = new URLSearchParams();
+  const currentParams = new URLSearchParams(location.search);
+  for (const key of ["month", "stores", "metric"]) {
+    const value = currentParams.get(key);
+    if (value) scopeParams.set(key, value);
+  }
+  const scopeSearch = scopeParams.size ? `?${scopeParams.toString()}` : "";
   const notifications = useQuery({
     queryKey: keys.resource(workspace.id, "notifications"),
     queryFn: ({ signal }) =>
@@ -134,66 +94,56 @@ function ShellContent({ workspace }: { workspace: Workspace }) {
   });
   const unread =
     notifications.data?.filter((item) => !item.read_at).length ?? 0;
-  const active = navigation.find((item) =>
-    location.pathname.includes(`/${item.path}`),
-  );
-  useEffect(() => {
-    setMobileOpen(false);
-    main.current?.focus({ preventScroll: true });
-  }, [location.pathname]);
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    sidebar.current?.querySelector<HTMLElement>("a,button,select")?.focus();
-    const keydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMobileOpen(false);
-        menuButton.current?.focus();
-      }
-      if (event.key !== "Tab") return;
-      const elements = sidebar.current?.querySelectorAll<HTMLElement>(
-        "a[href],button:not(:disabled),select:not(:disabled)",
-      );
-      if (!elements?.length) return;
-      const first = elements[0],
-        last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", keydown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", keydown);
-    };
-  }, [mobileOpen]);
+  const active = navigation.find((item) => {
+    const path = `/w/${workspace.id}/${item.path}`;
+    return (
+      location.pathname === path || location.pathname.startsWith(`${path}/`)
+    );
+  });
   return (
-    <div className={`app-shell ${mobileOpen ? "nav-open" : ""}`}>
+    <div className={`app-shell ${drawerOpen ? "nav-open" : ""}`}>
       <a className="skip-link" href="#main-content">
         К содержимому
       </a>
-      {mobileOpen && (
+      {drawerOpen && (
         <button
+          type="button"
           className="mobile-scrim"
           aria-label="Закрыть навигацию"
-          onClick={() => setMobileOpen(false)}
+          tabIndex={-1}
+          onClick={closeNavigation}
         />
       )}
-      <aside className="sidebar" ref={sidebar}>
-        <Link
-          className="brand"
-          to={`/w/${workspace.id}/${workspaceStart(workspace)}`}
-        >
-          <span className="brand-mark">р</span>
-          <span>
-            разбор<span className="brand-sub">аналитика сети</span>
-          </span>
-        </Link>
+      <aside
+        id="app-navigation"
+        className="sidebar"
+        ref={sidebar}
+        role={drawerOpen ? "dialog" : undefined}
+        aria-modal={drawerOpen ? true : undefined}
+        aria-label="Навигация по пространству"
+        aria-hidden={mobileViewport && !drawerOpen ? true : undefined}
+        inert={mobileViewport && !drawerOpen}
+      >
+        <div className="sidebar-heading">
+          <Link
+            className="brand"
+            to={`/w/${workspace.id}/${workspaceStart(workspace)}${scopeSearch}`}
+            onClick={navigateFromSidebar}
+          >
+            <span className="brand-mark">р</span>
+            <span>
+              разбор<span className="brand-sub">аналитика сети</span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            className="icon-button mobile-nav-close"
+            aria-label="Закрыть навигацию"
+            onClick={closeNavigation}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
         <div className="workspace-switch">
           <label htmlFor="workspace-select">Рабочее пространство</label>
           <select
@@ -219,9 +169,10 @@ function ShellContent({ workspace }: { workspace: Workspace }) {
               <NavLink
                 to={{
                   pathname: `/w/${workspace.id}/${item.path}`,
-                  search: location.search,
+                  search: scopeSearch,
                 }}
                 key={item.path}
+                onClick={navigateFromSidebar}
               >
                 <Icon name={item.icon} />
                 <span>{item.label}</span>
@@ -236,14 +187,24 @@ function ShellContent({ workspace }: { workspace: Workspace }) {
             <Icon name="lock" size={15} />
             <div>
               <strong>
-                {workspace.all_stores
-                  ? "Вся доступная сеть"
-                  : "Назначенные точки"}
+                {!can("analytics:read")
+                  ? "Технический доступ"
+                  : workspace.all_stores
+                    ? "Вся доступная сеть"
+                    : "Назначенные точки"}
               </strong>
-              <span>Область данных проверяется сервером</span>
+              <span>
+                {can("analytics:read")
+                  ? "Область данных проверяется сервером"
+                  : "Подключения и команда без финансовых данных"}
+              </span>
             </div>
           </div>
-          <NavLink className="settings-link" to={`/w/${workspace.id}/settings`}>
+          <NavLink
+            className="settings-link"
+            to={`/w/${workspace.id}/settings${scopeSearch}`}
+            onClick={navigateFromSidebar}
+          >
             <Icon name="settings" size={18} />
             Настройки
           </NavLink>
@@ -266,26 +227,35 @@ function ShellContent({ workspace }: { workspace: Workspace }) {
           </div>
         </div>
       </aside>
-      <div className="workspace-main">
+      <div className="workspace-main" inert={drawerOpen}>
         <header className="topbar">
           <div className="breadcrumbs">
             <button
               className="icon-button mobile-menu"
               ref={menuButton}
               aria-label="Открыть навигацию"
-              onClick={() => setMobileOpen(true)}
+              aria-controls="app-navigation"
+              aria-expanded={drawerOpen}
+              aria-haspopup="dialog"
+              onClick={openNavigation}
             >
               <Icon name="menu" />
             </button>
             <span>{workspace.name}</span>
             <Icon name="chevron" size={13} />
-            <strong>{active?.label ?? "Настройки"}</strong>
+            <strong>
+              {active?.label ??
+                (location.pathname === `/w/${workspace.id}/settings`
+                  ? "Настройки"
+                  : "Страница не найдена")}
+            </strong>
           </div>
           <div className="topbar-actions">
             {can("assistant:use") && active?.path !== "assistant" && (
               <Link
                 className="assistant-shortcut"
-                to={`/w/${workspace.id}/assistant${location.search}`}
+                to={`/w/${workspace.id}/assistant${scopeSearch}`}
+                aria-label="Вопрос к данным"
               >
                 <Icon name="assistant" size={17} />
                 <span>Вопрос к данным</span>
@@ -294,6 +264,8 @@ function ShellContent({ workspace }: { workspace: Workspace }) {
             <button
               className="icon-button notification-button"
               aria-label={`Уведомления${unread ? `, непрочитанных: ${unread}` : ""}`}
+              aria-haspopup="dialog"
+              aria-expanded={notificationsOpen}
               onClick={() => setNotificationsOpen(true)}
             >
               <Icon name="bell" />
@@ -326,89 +298,5 @@ function ShellContent({ workspace }: { workspace: Workspace }) {
         query={notifications}
       />
     </div>
-  );
-}
-
-function NotificationDialog({
-  workspaceId,
-  open,
-  close,
-  query,
-}: {
-  workspaceId: string;
-  open: boolean;
-  close: () => void;
-  query: ReturnType<typeof useQuery<Notification[]>>;
-}) {
-  const client = useQueryClient();
-  const navigate = useNavigate();
-  const mutation = useMutation({
-    mutationFn: (id: string) =>
-      post(workspacePath(workspaceId, `/notifications/${id}/read`)),
-    onSuccess: () =>
-      client.invalidateQueries({
-        queryKey: keys.resource(workspaceId, "notifications"),
-      }),
-  });
-  return (
-    <Modal
-      open={open}
-      onOpenChange={(value) => !value && close()}
-      title="Уведомления"
-      description="Ответы и изменения в доступных вам разборах."
-    >
-      <div className="modal-body">
-        {query.isPending ? (
-          <Loading />
-        ) : query.error ? (
-          <ErrorState error={query.error} />
-        ) : !query.data?.length ? (
-          <EmptyState
-            icon="bell"
-            title="Пока нет уведомлений"
-            description="Здесь появятся вопросы коллег и новые ответы в ваших разборах."
-          />
-        ) : (
-          <div className="notification-list">
-            {query.data.map((item) => (
-              <article
-                className={`notification-item ${!item.read_at ? "unread" : ""}`}
-                key={item.id}
-              >
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.body}</p>
-                  <time>{dateTime(item.created_at)}</time>
-                </div>
-                <div className="inline-actions">
-                  {item.case_id && (
-                    <Button
-                      variant="quiet"
-                      onClick={() => {
-                        mutation.mutate(item.id);
-                        close();
-                        navigate(`/w/${workspaceId}/cases/${item.case_id}`);
-                      }}
-                    >
-                      Открыть
-                    </Button>
-                  )}
-                  {!item.read_at && (
-                    <Button
-                      variant="quiet"
-                      loading={mutation.isPending}
-                      onClick={() => mutation.mutate(item.id)}
-                      aria-label={`Прочитано: ${item.title}`}
-                      icon="check"
-                    />
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-        {mutation.error && <ErrorState error={mutation.error} />}
-      </div>
-    </Modal>
   );
 }

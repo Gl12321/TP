@@ -1,0 +1,21 @@
+name: razbor-tests
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: razbor_test
+      POSTGRES_PASSWORD: local-test-only
+      POSTGRES_DB: razbor_tests
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U razbor_test -d razbor_tests"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  test_postgres_data:

@@ -57,6 +57,7 @@ class Database:
 def load_models() -> None:
     for name in ("access", "analytics", "assistant", "collaboration", "jobs", "sources"):
         import_module(f"backend.app.{name}.models")
+    import_module("backend.app.infrastructure.idempotency")
 
 
 async def get_db(request: Request) -> AsyncIterator[AsyncSession]:

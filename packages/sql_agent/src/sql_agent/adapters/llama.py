@@ -164,7 +164,12 @@ class LLMClient:
         return len(self._prompt_tokens(messages))
 
     def _generate(self, messages: list[dict[str, str]], grammar: str, context: QueryContext) -> str:
-        from llama_cpp import LlamaGrammar, StoppingCriteriaList
+        from llama_cpp import (
+            LlamaGrammar,
+            StoppingCriteriaList,
+            ggml_abort_callback,
+            llama_set_abort_callback,
+        )
 
         context.check_cancelled()
         self._check_memory()
@@ -181,33 +186,46 @@ class LLMClient:
         last_memory_check = time.monotonic()
         memory_exhausted = False
 
-        def stop(input_tokens, _scores):
+        def should_abort():
             nonlocal last_memory_check, memory_exhausted
             now = time.monotonic()
             if now - last_memory_check >= 1:
                 memory_exhausted = available_memory() < self.min_free_memory_mb * 1024 * 1024
                 last_memory_check = now
-            return (
-                memory_exhausted
-                or context.cancelled.is_set()
-                or now >= deadline
-                or (len(input_tokens) > len(tokens) and input_tokens[-1] == self._eos_id)
+            return memory_exhausted or context.cancelled.is_set() or now >= deadline
+
+        def check_abort():
+            context.check_cancelled()
+            if memory_exhausted:
+                raise QueryError(
+                    "memory_limit",
+                    "Во время генерации исчерпан резерв RAM. Выберите меньшую модель.",
+                )
+            if time.monotonic() >= deadline:
+                raise QueryError("generation_timeout", "Превышено время генерации SQL.")
+
+        def stop(input_tokens, _scores):
+            return should_abort() or (
+                len(input_tokens) > len(tokens) and input_tokens[-1] == self._eos_id
             )
 
-        response = self.model.create_completion(
-            prompt=tokens,
-            grammar=LlamaGrammar.from_string(grammar, verbose=False),
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            stopping_criteria=StoppingCriteriaList([stop]),
-        )
-        context.check_cancelled()
-        if memory_exhausted:
-            raise QueryError(
-                "memory_limit", "Во время генерации исчерпан резерв RAM. Выберите меньшую модель."
+        abort_callback = ggml_abort_callback(lambda _data: should_abort())
+        llama_set_abort_callback(self.model.ctx, abort_callback, None)
+        try:
+            response = self.model.create_completion(
+                prompt=tokens,
+                grammar=LlamaGrammar.from_string(grammar, verbose=False),
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                stopping_criteria=StoppingCriteriaList([stop]),
             )
-        if time.monotonic() >= deadline:
-            raise QueryError("generation_timeout", "Превышено время генерации SQL.")
+            check_abort()
+        except BaseException:
+            self.model.reset()
+            check_abort()
+            raise
+        finally:
+            llama_set_abort_callback(self.model.ctx, ggml_abort_callback(), None)
         choice = response["choices"][0]
         if choice.get("finish_reason") == "length":
             raise QueryError(

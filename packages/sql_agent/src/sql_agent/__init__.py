@@ -1,11 +1,47 @@
-from .contracts import AgentRequest, AgentResult, AgentSettings, CatalogSnapshot, QueryContext
+from .contracts import (
+    AgentRequest,
+    AgentResult,
+    AgentSettings,
+    AgentStatus,
+    CatalogSnapshot,
+    Column,
+    ConversationContext,
+    ForeignKey,
+    GenerationRefusal,
+    MetricDefinition,
+    QueryContext,
+    QueryError,
+    QueryEvent,
+    QueryResult,
+    RetrievedTable,
+    TableRef,
+    TableSchema,
+)
 from .pipeline.agent import SQLAgent
+from .ports import AllowedCatalog, ReadOnlyExecutor, SQLGenerator, TableRanker, TableRetriever
 
 __all__ = [
     "SQLAgent",
     "AgentRequest",
     "AgentResult",
     "AgentSettings",
+    "AgentStatus",
     "CatalogSnapshot",
+    "Column",
+    "ConversationContext",
+    "ForeignKey",
+    "GenerationRefusal",
+    "MetricDefinition",
     "QueryContext",
+    "QueryError",
+    "QueryEvent",
+    "QueryResult",
+    "RetrievedTable",
+    "TableRef",
+    "TableSchema",
+    "AllowedCatalog",
+    "ReadOnlyExecutor",
+    "SQLGenerator",
+    "TableRetriever",
+    "TableRanker",
 ]

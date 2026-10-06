@@ -12,6 +12,51 @@ import sys
 ROOT = Path(__file__).resolve().parent
 
 
+def check_host() -> int:
+    print(f"Python {sys.version.split()[0]}: {sys.executable}", flush=True)
+    if sys.version_info < (3, 11):
+        print("Нужен Python 3.11+. Установка: docs/operations/install.md", file=sys.stderr)
+        return 1
+    if shutil.which("docker") is None:
+        print(
+            "Docker не найден в PATH. Установите и запустите Docker: docs/operations/install.md",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        compose = subprocess.run(
+            ["docker", "compose", "version"],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+        )
+        print(compose.stdout.strip(), flush=True)
+        engine = subprocess.run(
+            ["docker", "info", "--format", "{{.OSType}}"],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+        )
+        if engine.stdout.strip() != "linux":
+            print("Переключите Docker на Linux-контейнеры.", file=sys.stderr)
+            return 1
+    except subprocess.CalledProcessError as error:
+        requirement = "Compose v2" if "compose" in error.cmd else "работающий Docker Engine"
+        print(f"Недоступен {requirement}. Подготовка: docs/operations/install.md", file=sys.stderr)
+        return 1
+    except (OSError, subprocess.TimeoutExpired):
+        print("Docker не отвечает. Запустите его и повторите проверку.", file=sys.stderr)
+        return 1
+    print("Docker Engine работает с Linux-контейнерами. Окружение хоста готово.", flush=True)
+    return 0
+
+
 def credentials(path: Path) -> dict[str, str]:
     values = {}
     if path.exists():
@@ -74,6 +119,9 @@ def launch_lock(path: Path):
 
 
 def main(argv=None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description="Разбор: аналитика сети, вопросы к данным и работа команды."
     )
@@ -89,6 +137,11 @@ def main(argv=None) -> int:
     action.add_argument(
         "--stop", action="store_true", help="остановить приложение, сохранив модели и данные"
     )
+    action.add_argument(
+        "--check",
+        action="store_true",
+        help="проверить Python, Compose и Docker Engine без сборок и загрузок",
+    )
     parser.add_argument(
         "--without-ai",
         action="store_true",
@@ -96,13 +149,12 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--env-file", type=Path, help="файл секретов и выбранной прикладной БД")
     args = parser.parse_args(argv)
-    if args.without_ai and (args.stop or args.list_models):
+    if args.without_ai and (args.stop or args.list_models or args.check):
         parser.error("--without-ai используется только при запуске приложения")
-    if shutil.which("docker") is None:
-        parser.exit(
-            1,
-            "Нужен работающий Docker с Compose v2: Docker Desktop на Windows или Docker Engine на Linux.\n",
-        )
+    if args.check:
+        return check_host()
+    if check_host():
+        return 1
     runtime = ROOT / ".runtime"
     runtime.mkdir(exist_ok=True)
     env_file = args.env_file.expanduser().resolve() if args.env_file else runtime / "compose.env"
@@ -147,14 +199,6 @@ def main(argv=None) -> int:
     try:
         with launch_lock(runtime / "launch.lock"):
             saved = credentials(env_file)
-            compose("version", stdout=subprocess.DEVNULL)
-            subprocess.run(
-                ["docker", "info"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=30,
-            )
             if args.stop:
                 compose("down", "--remove-orphans")
                 print("Приложение остановлено. Модели и данные сохранены.")
@@ -180,7 +224,7 @@ def main(argv=None) -> int:
             compose("run", "--rm", "--no-deps", "bootstrap-db")
             compose("run", "--rm", "--no-deps", "migrate")
             compose("up", "--detach", "--wait", "--wait-timeout", "120", "api")
-            port = environment.get("APP_PORT", "8000")
+            port = environment.get("APP_PORT", saved.get("APP_PORT")) or "8000"
             print(f"Интерфейс доступен: http://localhost:{port}", flush=True)
             print(f"Код первоначальной настройки: {saved['APP_BOOTSTRAP_TOKEN']}", flush=True)
             print("Он нужен только для создания первого администратора в браузере.", flush=True)

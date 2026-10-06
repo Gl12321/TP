@@ -525,6 +525,22 @@
   font-size: 12px;
   white-space: nowrap;
 }
+.pagination-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px;
+  border-top: 1px solid var(--border);
+}
+.pagination-footer .form-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.list-toolbar .segmented {
+  flex-wrap: wrap;
+}
 .search-input {
   display: flex;
   align-items: center;

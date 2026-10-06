@@ -23,4 +23,5 @@ local = [
 where = ["src"]
 
 [tool.setuptools.package-data]
+"sql_agent" = ["py.typed"]
 "sql_agent.sql.grammar" = ["*.gbnf"]

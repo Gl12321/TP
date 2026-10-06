@@ -1,7 +1,15 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .query import AgentResult, GenerationRefusal, QueryContext, QueryError, QueryEvent, QueryResult
+from .query import (
+    AgentResult,
+    AgentStatus,
+    GenerationRefusal,
+    QueryContext,
+    QueryError,
+    QueryEvent,
+    QueryResult,
+)
 from .schema import Column, ForeignKey, RetrievedTable, TableRef, TableSchema
 
 
@@ -92,6 +100,7 @@ class AgentSettings:
 __all__ = [
     "AgentRequest",
     "AgentResult",
+    "AgentStatus",
     "AgentSettings",
     "CatalogSnapshot",
     "Column",

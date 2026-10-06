@@ -125,6 +125,7 @@ export type Source = {
   schemas: string[];
   enabled: boolean;
   catalog_version: number;
+  permitted_table_count?: number;
   status: string;
   last_checked_at: string | null;
   error: string | { message: string } | null;
@@ -308,9 +309,29 @@ export type Notification = {
   title: string;
   body: string;
   case_id: string | null;
+  source_issue_id?: string | null;
   read_at: string | null;
   created_at: string;
 };
+export type SourceIssue = {
+  id: string;
+  source_id: string;
+  source_name: string;
+  title: string;
+  body: string;
+  status: "open" | "in_progress" | "resolved";
+  created_by: string;
+  assignee_id: string | null;
+  resolution: string | null;
+  source_status: string;
+  source_error: string | { message: string } | null;
+  last_checked_at: string | null;
+  current_source_status: string;
+  created_at: string;
+  updated_at: string;
+};
+export type SourceIssueDetail = SourceIssue & { comments: CaseComment[] };
+export type SourceAdministrator = { id: string; name: string };
 export type Invitation = {
   id: string;
   email: string;

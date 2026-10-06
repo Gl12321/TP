@@ -15,10 +15,10 @@ export function setCsrfToken(token: string) {
   csrfToken = token;
 }
 
-export async function request<T>(
+async function exchange<T>(
   path: string,
   options: RequestInit = {},
-): Promise<T> {
+): Promise<{ payload: T; headers: Headers }> {
   const headers = new Headers(options.headers);
   const method = options.method ?? "GET";
   if (options.body && !(options.body instanceof FormData))
@@ -61,7 +61,27 @@ export async function request<T>(
       "invalid_response",
       "Сервер вернул неожиданный ответ.",
     );
-  return payload as T;
+  return { payload: payload as T, headers: response.headers };
+}
+
+export async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return (await exchange<T>(path, options)).payload;
+}
+
+export type Page<T> = { items: T[]; nextCursor: string | null };
+
+export async function getPage<T>(
+  path: string,
+  signal?: AbortSignal,
+): Promise<Page<T>> {
+  const response = await exchange<T[]>(path, { signal });
+  return {
+    items: response.payload,
+    nextCursor: response.headers.get("X-Next-Cursor"),
+  };
 }
 
 export const get = <T>(path: string, signal?: AbortSignal) =>

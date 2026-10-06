@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from .contracts import CatalogSnapshot, QueryContext, QueryResult
+from .contracts import CatalogSnapshot, QueryContext, QueryResult, RetrievedTable
 
 
 class AllowedCatalog(Protocol):
@@ -20,3 +20,15 @@ class SQLGenerator(Protocol):
 
 class ReadOnlyExecutor(Protocol):
     async def execute(self, sql: str, context: QueryContext) -> QueryResult: ...
+
+
+class TableRetriever(Protocol):
+    async def retrieve(
+        self, question: str, snapshot: CatalogSnapshot, context: QueryContext
+    ) -> list[RetrievedTable]: ...
+
+
+class TableRanker(Protocol):
+    async def rerank(
+        self, question: str, documents: list[RetrievedTable], context: QueryContext
+    ) -> list[RetrievedTable]: ...

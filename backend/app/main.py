@@ -11,18 +11,19 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.access import routes as access_routes
-from backend.app.access import account as account_routes
-from backend.app.analytics import routes as analytics_routes
-from backend.app.assistant import routes as assistant_routes
-from backend.app.collaboration import routes as collaboration_routes
+from backend.app.access.api import auth as access_routes
+from backend.app.access.api import account as account_routes
+from backend.app.analytics.api import routes as analytics_routes
+from backend.app.assistant.api import routes as assistant_routes
+from backend.app.collaboration.api import routes as collaboration_routes
 from backend.app.infrastructure.config import load_settings
 from backend.app.infrastructure.database import Database, load_models
 from backend.app.infrastructure.errors import AppError, handle_app_error
 from backend.app.infrastructure.http import BodyLimitMiddleware
 from backend.app.infrastructure.security import DUMMY_PASSWORD_HASH
 from backend.app.sources.service import SourceConnections
-from backend.app.sources import routes as source_routes
+from backend.app.sources.api import connections as source_routes
+from backend.app.sources.api import issues as issue_routes
 
 
 logger = logging.getLogger("razbor.api")
@@ -116,6 +117,7 @@ def create_app(settings=None):
             allow_credentials=True,
             allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
             allow_headers=["Content-Type", "X-CSRF-Token", "Last-Event-ID"],
+            expose_headers=["X-Next-Cursor"],
         )
     app.add_middleware(BodyLimitMiddleware)
 
@@ -124,6 +126,7 @@ def create_app(settings=None):
         account_routes.router,
         analytics_routes.router,
         source_routes.router,
+        issue_routes.router,
         assistant_routes.router,
         collaboration_routes.router,
     ):

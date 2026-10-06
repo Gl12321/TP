@@ -10,42 +10,42 @@ import { lazy, Suspense } from "react";
 import type { ReactNode } from "react";
 
 const OverviewPage = lazy(() =>
-  import("../features/overview/OverviewPage").then((module) => ({
+  import("../features/overview/pages/OverviewPage").then((module) => ({
     default: module.OverviewPage,
   })),
 );
 const StoresPage = lazy(() =>
-  import("../features/stores/StoresPage").then((module) => ({
+  import("../features/stores/pages/StoresPage").then((module) => ({
     default: module.StoresPage,
   })),
 );
 const StorePage = lazy(() =>
-  import("../features/stores/StoresPage").then((module) => ({
+  import("../features/stores/pages/StoresPage").then((module) => ({
     default: module.StorePage,
   })),
 );
 const AssistantPage = lazy(() =>
-  import("../features/assistant/AssistantPage").then((module) => ({
+  import("../features/assistant/pages/AssistantPage").then((module) => ({
     default: module.AssistantPage,
   })),
 );
 const ReportsPage = lazy(() =>
-  import("../features/reports/ReportsPage").then((module) => ({
+  import("../features/reports/pages/ReportsPage").then((module) => ({
     default: module.ReportsPage,
   })),
 );
 const CasesPage = lazy(() =>
-  import("../features/cases/CasesPage").then((module) => ({
+  import("../features/cases/pages/CasesPage").then((module) => ({
     default: module.CasesPage,
   })),
 );
 const DataPage = lazy(() =>
-  import("../features/data/DataPage").then((module) => ({
+  import("../features/data/pages/DataPage").then((module) => ({
     default: module.DataPage,
   })),
 );
 const SettingsPage = lazy(() =>
-  import("../features/settings/SettingsPage").then((module) => ({
+  import("../features/settings/pages/SettingsPage").then((module) => ({
     default: module.SettingsPage,
   })),
 );

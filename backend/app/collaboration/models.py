@@ -2,6 +2,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     DateTime,
+    CheckConstraint,
     Date,
     ForeignKey,
     ForeignKeyConstraint,
@@ -107,6 +108,10 @@ class AssignedQuestion(Identity, Base):
 class Notification(Identity, Base):
     __tablename__ = "notifications"
     __table_args__ = (
+        CheckConstraint(
+            "(case_id IS NOT NULL AND source_issue_id IS NULL) OR (case_id IS NULL AND source_issue_id IS NOT NULL)",
+            name="ck_notification_target",
+        ),
         ForeignKeyConstraint(
             ["case_id", "workspace_id"],
             ["cases.id", "cases.workspace_id"],
@@ -117,11 +122,17 @@ class Notification(Identity, Base):
             ["memberships.workspace_id", "memberships.user_id"],
             name="fk_notification_member",
         ),
+        ForeignKeyConstraint(
+            ["source_issue_id", "workspace_id"],
+            ["source_issues.id", "source_issues.workspace_id"],
+            name="fk_notification_source_issue_workspace",
+        ),
     )
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("app_users.id"), index=True)
     kind: Mapped[str] = mapped_column(String(32))
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text, default="")
-    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"))
+    case_id: Mapped[str | None] = mapped_column(ForeignKey("cases.id"), nullable=True)
+    source_issue_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

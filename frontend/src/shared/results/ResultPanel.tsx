@@ -10,7 +10,6 @@ import {
   Button,
   Field,
   Form,
-  formText,
   InlineError,
   Modal,
   StatusBadge,
@@ -18,6 +17,8 @@ import {
 import { compareDecimal, dateTime, decimal, periodLabel } from "../ui/format";
 import { Icon } from "../ui/Icon";
 import { useToast } from "../ui/Toast";
+import { useDraft } from "../ui/useDraft";
+import { useSubmissionKey } from "../ui/useSubmissionKey";
 import { DataTable } from "./DataTable";
 import { downloadText, rawCell, resultCsv } from "./export";
 import { ResultChart } from "./ResultChart";
@@ -313,10 +314,19 @@ function SaveResultDialog({
   const { id } = useWorkspace();
   const client = useQueryClient();
   const [saved, setSaved] = useState<Report | Case | null>(null);
+  const empty = { title: run.question.slice(0, 180), description: "" };
+  const draftName = `result-save:${kind}:${run.id}`;
+  const [draft, update] = useDraft(draftName, empty);
+  const { keyFor, clearKey } = useSubmissionKey(draftName);
   const mutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
-      post<Report | Case>(workspacePath(id, `/${kind}`), body),
+      post<Report | Case>(workspacePath(id, `/${kind}`), {
+        ...body,
+        idempotency_key: keyFor(body),
+      }),
     onSuccess: (result) => {
+      clearKey();
+      update(empty);
       setSaved(result);
       void client.invalidateQueries({ queryKey: keys.resource(id, kind) });
     },
@@ -324,7 +334,7 @@ function SaveResultDialog({
   return (
     <Modal
       open
-      onOpenChange={(open) => !open && close()}
+      onOpenChange={(open) => !open && !mutation.isPending && close()}
       title={
         kind === "reports"
           ? "Сохранить отчёт"
@@ -354,10 +364,11 @@ function SaveResultDialog({
           </div>
         ) : (
           <Form
-            onSubmit={(form) =>
+            onSubmit={() => {
+              if (!draft.title.trim() || mutation.isPending) return;
               mutation.mutate({
-                title: formText(form, "title"),
-                description: formText(form, "description"),
+                title: draft.title.trim(),
+                description: draft.description.trim(),
                 run_id: run.id,
                 ...(kind === "cases"
                   ? {
@@ -365,15 +376,19 @@ function SaveResultDialog({
                       ...(reportId ? { report_id: reportId } : {}),
                     }
                   : {}),
-              })
-            }
+              });
+            }}
           >
             <Field label="Название">
               <input
                 name="title"
                 required
                 maxLength={180}
-                defaultValue={run.question.slice(0, 180)}
+                value={draft.title}
+                onChange={(event) =>
+                  update({ ...draft, title: event.target.value })
+                }
+                disabled={mutation.isPending}
               />
             </Field>
             <Field label="Описание">
@@ -381,15 +396,28 @@ function SaveResultDialog({
                 name="description"
                 rows={3}
                 maxLength={3000}
+                value={draft.description}
+                onChange={(event) =>
+                  update({ ...draft, description: event.target.value })
+                }
+                disabled={mutation.isPending}
                 placeholder="Что важно учитывать при чтении этого результата?"
               />
             </Field>
             <InlineError error={mutation.error} />
             <div className="form-actions">
-              <Button variant="secondary" onClick={close}>
+              <Button
+                variant="secondary"
+                onClick={close}
+                disabled={mutation.isPending}
+              >
                 Отмена
               </Button>
-              <Button type="submit" loading={mutation.isPending}>
+              <Button
+                type="submit"
+                loading={mutation.isPending}
+                disabled={!draft.title.trim()}
+              >
                 Сохранить
               </Button>
             </div>

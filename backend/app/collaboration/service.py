@@ -35,12 +35,10 @@ async def get_case(db, case_id, access, *, for_update=False):
     return case
 
 
-async def validate_recipient(db, user_id, workspace_id, store_ids, run_id=None):
+async def validate_recipient(db, user_id, case):
     try:
-        access = await get_access(db, user_id, workspace_id)
-        access.require_scope(store_ids)
-        if run_id:
-            await get_run(db, run_id, access, shared=True)
+        access = await get_access(db, user_id, case.workspace_id)
+        await check_case(db, case, access)
     except AppError as error:
         raise AppError(
             "recipient_scope", "Адресат не имеет доступа ко всей области разбора", 403

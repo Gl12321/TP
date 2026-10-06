@@ -13,7 +13,7 @@ from backend.app.sources.models import Source
 
 
 def public_source(source):
-    return {
+    result = {
         key: getattr(source, key)
         for key in (
             "id",
@@ -33,6 +33,8 @@ def public_source(source):
             "error",
         )
     }
+    result["permitted_table_count"] = len(source.policies)
+    return result
 
 
 def can_read_source(source, access):

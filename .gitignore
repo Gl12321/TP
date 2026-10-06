@@ -18,6 +18,7 @@ build/
 playwright-report/
 test-results/
 .vite/
+*.tsbuildinfo
 razbor.db
 razbor.db-shm
 razbor.db-wal

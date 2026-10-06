@@ -2,8 +2,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from threading import Event
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 from uuid import uuid4
+
+
+AgentStatus = Literal["success", "clarification", "not_found", "cancelled", "error"]
 
 
 class GenerationRefusal(str, Enum):
@@ -67,7 +70,7 @@ class QueryResult:
 
 @dataclass
 class AgentResult:
-    status: str
+    status: AgentStatus
     result: QueryResult | None = None
     error: str | None = None
     error_code: str | None = None

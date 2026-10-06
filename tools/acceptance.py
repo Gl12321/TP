@@ -40,8 +40,12 @@ class Client:
     def wait(self, prefix, run_id):
         deadline = time.monotonic() + 900
         previous = None
+        peak_api_seconds = 0
         while time.monotonic() < deadline:
+            started = time.monotonic()
             run = self.call("GET", f"{prefix}/runs/{run_id}")
+            self.call("GET", "/api/v1/auth/session")
+            peak_api_seconds = max(peak_api_seconds, time.monotonic() - started)
             if run["stage"] != previous:
                 print(f"AI stage: {run['stage']}", flush=True)
                 previous = run["stage"]
@@ -50,6 +54,10 @@ class Client:
                     raise AssertionError(
                         f"AI did not complete: {run['status']}; {run.get('error')}"
                     )
+                print(
+                    f"Peak run and session API round-trip during inference: {peak_api_seconds:.3f}s",
+                    flush=True,
+                )
                 return run
             time.sleep(2)
         raise TimeoutError("AI request exceeded acceptance deadline")

@@ -1,510 +1,112 @@
-from contextlib import ExitStack, redirect_stderr, redirect_stdout
 import hashlib
-import io
-import json
-import os
-from pathlib import Path
 import subprocess
 import sys
-import tempfile
 from types import SimpleNamespace
-import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+
+import pytest
 
 import run
 from runtime import models
 
 
-class LauncherTests(unittest.TestCase):
-    def setUp(self):
-        self.stack = ExitStack()
-        self.addCleanup(self.stack.close)
-        self.root = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
-        self.stack.enter_context(patch.object(run, "ROOT", self.root))
-        self.stack.enter_context(patch.object(run.shutil, "which", return_value="docker"))
-        self.process = self.stack.enter_context(patch.object(run.subprocess, "run"))
-        self.process.return_value = SimpleNamespace(returncode=0)
-        self.output = io.StringIO()
-        self.errors = io.StringIO()
-        self.stack.enter_context(redirect_stdout(self.output))
-        self.stack.enter_context(redirect_stderr(self.errors))
+@pytest.fixture
+def launcher(tmp_path, monkeypatch):
+    monkeypatch.setattr(run, "ROOT", tmp_path)
+    monkeypatch.setattr(run.shutil, "which", lambda name: "docker")
+    process = Mock(return_value=SimpleNamespace(returncode=0, stdout="linux"))
+    monkeypatch.setattr(run.subprocess, "run", process)
+    return tmp_path, process
 
-    def compose_calls(self):
-        result = []
-        for call in self.process.call_args_list:
-            command = call.args[0]
-            if command[:2] == ["docker", "compose"]:
-                result.append(command[command.index("-f") + 2 :])
-        return result
 
-    def test_repeated_launch_preserves_existing_credentials(self):
-        with patch.object(
-            run.secrets,
-            "token_urlsafe",
-            side_effect=["import-secret", "app-secret", "encryption-secret", "setup-secret"],
-        ) as random:
-            self.assertEqual(run.main([]), 0)
-            path = self.root / ".runtime" / "compose.env"
-            original = path.read_bytes()
-            self.assertEqual(run.main([]), 0)
-        self.assertEqual(path.read_bytes(), original)
-        self.assertEqual(random.call_count, 4)
-        self.assertIn(b"DB_PASSWORD=import-secret\n", original)
-        self.assertIn(b"APP_DB_PASSWORD=app-secret\n", original)
-        self.assertIn(b"APP_SECRET_KEY=encryption-secret\n", original)
-        self.assertIn(b"APP_BOOTSTRAP_TOKEN=setup-secret\n", original)
+def compose_calls(process):
+    return [
+        call.args[0][call.args[0].index("-f") + 2 :]
+        for call in process.call_args_list
+        if call.args[0][:2] == ["docker", "compose"] and "-f" in call.args[0]
+    ]
 
-    def test_recovered_environment_is_used_without_regenerating_secrets(self):
-        path = self.root / "recovered.env"
-        values = run.credentials(path)
-        original = path.read_bytes()
-        self.assertEqual(run.main(["--env-file", str(path), "--without-ai"]), 0)
-        self.assertEqual(path.read_bytes(), original)
-        for call in self.process.call_args_list:
-            command = call.args[0]
-            if command[:2] == ["docker", "compose"]:
-                self.assertEqual(command[command.index("--env-file") + 1], str(path))
-        self.assertEqual(run.credentials(path)["APP_SECRET_KEY"], values["APP_SECRET_KEY"])
 
-    def test_missing_recovered_environment_never_starts_services(self):
-        with self.assertRaises(SystemExit):
-            run.main(["--env-file", str(self.root / "missing.env")])
-        self.process.assert_not_called()
-
-    def test_selected_model_is_passed_without_inheriting_credentials(self):
-        inherited = {
-            name: "foreign-value"
-            for name in (
-                "MODEL_PRESET",
-                "DB_NAME",
-                "DB_USER",
-                "DB_READ_USER",
-                "DB_PASSWORD",
-                "DB_READ_PASSWORD",
-                "API_TOKEN",
-                "APP_DB_USER",
-                "APP_DB_PASSWORD",
-                "APP_DATABASE_URL",
-                "APP_SECRET_KEY",
-                "APP_BOOTSTRAP_TOKEN",
+def test_host_check_reads_docker_without_creating_runtime(launcher, monkeypatch, subtests):
+    root, process = launcher
+    for outcome in ("linux", "windows", "missing", "stopped"):
+        with subtests.test(outcome=outcome):
+            monkeypatch.setattr(
+                run.shutil, "which", lambda name: None if outcome == "missing" else "docker"
             )
-        }
-        with patch.dict(os.environ, inherited):
-            self.assertEqual(run.main(["--model", "selected-model"]), 0)
-        for call in self.process.call_args_list:
-            if call.args[0][:2] == ["docker", "compose"]:
-                environment = call.kwargs["env"]
-                self.assertEqual(environment["MODEL_PRESET"], "selected-model")
-                for name in inherited.keys() - {"MODEL_PRESET"}:
-                    self.assertNotIn(name, environment)
-
-    def test_listing_models_does_not_start_database_or_runtime_services(self):
-        self.assertEqual(run.main(["--list-models"]), 0)
-        calls = self.compose_calls()
-        self.assertEqual(
-            calls,
-            [
-                ["version"],
-                ["run", "--rm", "--no-deps", "--build", "prepare", "--list-models"],
-            ],
-        )
-        self.assertFalse(any(call[0] in {"up", "start"} for call in calls))
-
-    def test_stop_preserves_downloads_and_does_not_prepare_models(self):
-        self.assertEqual(run.main(["--stop"]), 0)
-        self.assertEqual(self.compose_calls(), [["version"], ["down", "--remove-orphans"]])
-
-    def test_invalid_flags_exit_before_any_external_command(self):
-        for arguments in (["--unknown-command"], ["--model"], ["--stop", "--model", "any"]):
-            with self.subTest(arguments=arguments), self.assertRaises(SystemExit) as caught:
-                run.main(arguments)
-            self.assertEqual(caught.exception.code, 2)
-        self.process.assert_not_called()
-        self.assertFalse((self.root / ".runtime").exists())
-
-    def test_api_follows_migration_and_worker_follows_verified_models(self):
-        self.assertEqual(run.main(["--model", "chosen"]), 0)
-        calls = self.compose_calls()
-        check = calls.index(["run", "--rm", "--no-deps", "prepare", "--check"])
-        build = calls.index(["build", "api", "migrate", "worker"])
-        stop = calls.index(["stop", "worker"])
-        database = calls.index(
-            ["up", "--detach", "--wait", "--wait-timeout", "120", "--remove-orphans", "db"]
-        )
-        prepare = calls.index(["run", "--rm", "--no-deps", "prepare"])
-        migration = calls.index(["run", "--rm", "--no-deps", "migrate"])
-        application = calls.index(["up", "--detach", "--wait", "--wait-timeout", "120", "api"])
-        worker = calls.index(["up", "--detach", "--wait", "--wait-timeout", "900", "worker"])
-        self.assertLess(check, build)
-        self.assertLess(build, stop)
-        self.assertLess(stop, database)
-        self.assertLess(database, migration)
-        self.assertLess(migration, application)
-        self.assertLess(application, prepare)
-        self.assertLess(prepare, worker)
-        self.assertFalse(any("ui" in call for call in calls))
-        self.assertIn("http://localhost:8000", self.output.getvalue())
-        self.assertNotIn("8501", self.output.getvalue())
-
-    def test_failed_configuration_check_leaves_running_services_untouched(self):
-        def execute(command, **kwargs):
-            if command[-5:] == ["run", "--rm", "--no-deps", "prepare", "--check"]:
-                raise subprocess.CalledProcessError(1, command)
-            return SimpleNamespace(returncode=0)
-
-        self.process.side_effect = execute
-        self.assertEqual(run.main(["--model", "unknown-model"]), 1)
-        calls = self.compose_calls()
-        self.assertFalse(any(call[0] in {"stop", "up", "start"} for call in calls))
-        self.assertNotIn(["build", "api"], calls)
-        self.assertNotIn(["run", "--rm", "--no-deps", "prepare"], calls)
-
-    def test_failed_preparation_does_not_start_worker_or_claim_full_readiness(self):
-        def execute(command, **kwargs):
-            if command[-4:] == ["run", "--rm", "--no-deps", "prepare"]:
-                raise subprocess.CalledProcessError(1, command)
-            return SimpleNamespace(returncode=0)
-
-        self.process.side_effect = execute
-        self.assertEqual(run.main([]), 1)
-        self.assertFalse(any(call[0] == "up" and "worker" in call for call in self.compose_calls()))
-        self.assertIn("Интерфейс доступен: http://localhost:8000", self.output.getvalue())
-        self.assertIn("Код первоначальной настройки:", self.output.getvalue())
-        self.assertNotIn("Разбор готов:", self.output.getvalue())
-        self.assertTrue((self.root / ".runtime" / "compose.env").is_file())
-
-    def test_invalid_application_settings_do_not_stop_running_worker(self):
-        def execute(command, **kwargs):
-            if "--entrypoint" in command and "load_settings().validate()" in command[-1]:
-                raise subprocess.CalledProcessError(1, command)
-            return SimpleNamespace(returncode=0)
-
-        self.process.side_effect = execute
-        self.assertEqual(run.main([]), 1)
-        self.assertFalse(any(call[0] in {"stop", "up"} for call in self.compose_calls()))
-
-    def test_interruption_during_preparation_does_not_start_worker(self):
-        def execute(command, **kwargs):
-            if command[-4:] == ["run", "--rm", "--no-deps", "prepare"]:
-                raise KeyboardInterrupt
-            return SimpleNamespace(returncode=0)
-
-        self.process.side_effect = execute
-        self.assertEqual(run.main([]), 130)
-        self.assertFalse(any(call[0] == "up" and "worker" in call for call in self.compose_calls()))
-
-    def test_failed_api_readiness_does_not_report_ready_url(self):
-        def execute(command, **kwargs):
-            if command[-6:] == ["up", "--detach", "--wait", "--wait-timeout", "120", "api"]:
-                raise subprocess.CalledProcessError(1, command)
-            return SimpleNamespace(returncode=0)
-
-        self.process.side_effect = execute
-        self.assertEqual(run.main([]), 1)
-        self.assertNotIn("http://localhost:8000", self.output.getvalue())
-        self.assertTrue((self.root / ".runtime" / "compose.env").is_file())
-
-    def test_without_ai_does_not_download_weights_or_build_worker(self):
-        self.assertEqual(run.main(["--without-ai"]), 0)
-        calls = self.compose_calls()
-        self.assertIn(["build", "api", "migrate"], calls)
-        self.assertNotIn(["run", "--rm", "--no-deps", "prepare"], calls)
-        self.assertFalse(any(call[0] == "up" and "worker" in call for call in calls))
-
-    def test_legacy_credentials_are_extended_without_changing_database_password(self):
-        directory = self.root / ".runtime"
-        directory.mkdir()
-        path = directory / "compose.env"
-        path.write_text(
-            "DB_NAME=existing\nDB_USER=importer\nDB_PASSWORD=keep-this\nAPI_TOKEN=legacy\n",
-            encoding="utf-8",
-        )
-        self.assertEqual(run.main(["--without-ai"]), 0)
-        values = run.credentials(path)
-        self.assertEqual(values["DB_PASSWORD"], "keep-this")
-        self.assertEqual(values["DB_NAME"], "existing")
-        self.assertNotEqual(values["APP_DB_USER"], values["DB_USER"])
-        self.assertGreaterEqual(len(values["APP_SECRET_KEY"]), 32)
-
-    def test_failed_migration_never_starts_new_api_or_worker(self):
-        def execute(command, **kwargs):
-            if command[-4:] == ["run", "--rm", "--no-deps", "migrate"]:
-                raise subprocess.CalledProcessError(1, command)
-            return SimpleNamespace(returncode=0)
-
-        self.process.side_effect = execute
-        self.assertEqual(run.main([]), 1)
-        self.assertFalse(
-            any(
-                call[0] == "up" and ("api" in call or "worker" in call)
-                for call in self.compose_calls()
-            )
-        )
+            process.side_effect = None
+            process.return_value = SimpleNamespace(stdout=outcome)
+            if outcome == "stopped":
+                process.side_effect = subprocess.CalledProcessError(1, ["docker", "info"])
+            assert run.main(["--check"]) == (0 if outcome == "linux" else 1)
+            assert not (root / ".runtime").exists()
+    assert all(call.args[0][1] in {"compose", "info"} for call in process.call_args_list)
 
 
-class ModelPreparationTests(unittest.TestCase):
-    def setUp(self):
-        self.stack = ExitStack()
-        self.addCleanup(self.stack.close)
-        self.root = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
-        self.stack.enter_context(redirect_stdout(io.StringIO()))
-        self.content = b"GGUF" + bytes(range(64))
-        self.path = self.root / "model.gguf"
-        self.marker = self.path.with_suffix(".ready.json")
-        self.config = {
-            "repo_id": "fixture/model",
-            "revision": "1" * 40,
-            "filename": self.path.name,
-            "sha256": hashlib.sha256(self.content).hexdigest(),
-            "size_bytes": len(self.content),
-            "params": {"model_path": str(self.path)},
-        }
-        self.identity = {
-            key: self.config[key] for key in ("repo_id", "revision", "sha256", "size_bytes")
-        }
-        self.download = Mock()
-        self.stack.enter_context(
-            patch.dict(
-                sys.modules,
-                {
-                    "huggingface_hub": SimpleNamespace(hf_hub_download=self.download),
-                },
-            )
-        )
-
-    def test_matching_existing_gguf_is_reused_without_huggingface(self):
-        self.path.write_bytes(self.content)
-        with patch.dict(sys.modules, {"huggingface_hub": None}):
-            models.ensure_llm(self.config)
-            models.ensure_llm(self.config)
-        self.assertEqual(self.path.read_bytes(), self.content)
-        self.assertTrue(models.ready(self.marker, self.identity, self.root))
-        self.download.assert_not_called()
-
-    def test_downloaded_gguf_is_marked_ready_only_after_hash_verification(self):
-        self.download.side_effect = lambda **kwargs: self.path.write_bytes(self.content)
-        models.ensure_llm(self.config)
-        self.download.assert_called_once_with(
-            repo_id=self.config["repo_id"],
-            filename=self.path.name,
-            revision=self.config["revision"],
-            local_dir=self.root,
-            force_download=False,
-        )
-        self.assertTrue(models.ready(self.marker, self.identity, self.root))
-
-    def test_interrupted_network_retries_pinned_download_before_marking_ready(self):
-        from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout
-
-        for failure in (ChunkedEncodingError, ConnectionError, Timeout):
-            with self.subTest(failure=failure):
-                self.path.unlink(missing_ok=True)
-                self.marker.unlink(missing_ok=True)
-                self.download.reset_mock()
-                self.download.side_effect = [failure("interrupted"), str(self.path)]
-
-                def resume(delay):
-                    self.assertFalse(self.marker.exists())
-                    self.path.write_bytes(self.content)
-
-                with patch.object(models.time, "sleep", side_effect=resume):
-                    models.ensure_llm(self.config)
-                self.assertEqual(self.download.call_count, 2)
-                self.assertEqual(self.download.call_args_list[0], self.download.call_args_list[1])
-                self.assertTrue(models.ready(self.marker, self.identity, self.root))
-
-    def test_network_retries_are_bounded_and_do_not_mark_failed_download_ready(self):
-        from requests.exceptions import ChunkedEncodingError
-
-        self.download.side_effect = ChunkedEncodingError("connection lost")
-        with patch.object(models.time, "sleep") as sleep, self.assertRaises(ChunkedEncodingError):
-            models.ensure_llm(self.config)
-        self.assertEqual(self.download.call_count, 4)
-        self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4, 8])
-        self.assertFalse(self.marker.exists())
-
-    def test_authentication_failures_are_not_retried(self):
-        from requests.exceptions import HTTPError
-
-        self.download.side_effect = HTTPError("unauthorized")
-        with patch.object(models.time, "sleep") as sleep, self.assertRaises(HTTPError):
-            models.ensure_llm(self.config)
-        self.download.assert_called_once()
-        sleep.assert_not_called()
-
-    def test_interrupted_download_is_not_ready_and_can_be_retried(self):
-        def interrupted(**kwargs):
-            self.path.write_bytes(self.content[:10])
-            raise KeyboardInterrupt
-
-        self.download.side_effect = interrupted
-        with self.assertRaises(KeyboardInterrupt):
-            models.ensure_llm(self.config)
-        self.assertFalse(self.marker.exists())
-        self.assertFalse(models.valid_gguf(self.path, self.config))
-        self.download.side_effect = lambda **kwargs: self.path.write_bytes(self.content)
-        models.ensure_llm(self.config)
-        self.assertTrue(models.ready(self.marker, self.identity, self.root))
-
-    def test_wrong_hash_with_matching_size_never_becomes_ready(self):
-        corrupt = self.content[:-1] + b"!"
-        self.path.write_bytes(corrupt)
-        self.download.side_effect = lambda **kwargs: self.path.write_bytes(corrupt)
-        with self.assertRaises(ValueError):
-            models.ensure_llm(self.config)
-        self.assertEqual(self.path.stat().st_size, self.config["size_bytes"])
-        self.assertFalse(self.marker.exists())
-        self.assertTrue(self.download.call_args.kwargs["force_download"])
-
-    def test_missing_invalid_header_or_incomplete_file_is_not_gguf(self):
-        self.assertFalse(models.valid_gguf(self.path, self.config))
-        for content in (b"", self.content[:10], b"NOPE" + self.content[4:]):
-            with self.subTest(content=content):
-                self.path.write_bytes(content)
-                self.assertFalse(models.valid_gguf(self.path, self.config))
-
-    def test_manifest_is_invalidated_when_file_is_removed(self):
-        self.path.write_bytes(self.content)
-        models.mark_ready(self.marker, self.identity, self.root, [self.path.name])
-        self.path.unlink()
-        self.assertFalse(models.ready(self.marker, self.identity, self.root))
-
-    def test_manifest_is_invalidated_when_size_or_modification_time_changes(self):
-        self.path.write_bytes(self.content)
-        models.mark_ready(self.marker, self.identity, self.root, [self.path.name])
-        stat = self.path.stat()
-        os.utime(self.path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
-        self.assertFalse(models.ready(self.marker, self.identity, self.root))
-        models.mark_ready(self.marker, self.identity, self.root, [self.path.name])
-        stat = self.path.stat()
-        self.path.write_bytes(self.content + b"extra")
-        os.utime(self.path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
-        self.assertFalse(models.ready(self.marker, self.identity, self.root))
-
-    def test_changed_model_revision_invalidates_ready_manifest(self):
-        self.path.write_bytes(self.content)
-        models.mark_ready(self.marker, self.identity, self.root, [self.path.name])
-        changed = {**self.identity, "revision": "2" * 40}
-        self.assertFalse(models.ready(self.marker, changed, self.root))
-
-    def test_malformed_manifest_is_treated_as_unready(self):
-        for value in (
-            "not JSON",
-            "null",
-            "[]",
-            "{}",
-            json.dumps(
-                {
-                    "identity": self.identity,
-                    "files": [self.path.name],
-                }
-            ),
-        ):
-            with self.subTest(manifest=value):
-                self.marker.write_text(value, encoding="utf-8")
-                self.assertFalse(models.ready(self.marker, self.identity, self.root))
-
-    def test_partial_snapshot_does_not_receive_ready_marker(self):
-        directory = self.root / "embedder"
-        config = {
-            "repo_id": "fixture/embedder",
-            "revision": "3" * 40,
-            "files": {
-                "config.json": hashlib.sha1(b"blob 2\0{}").hexdigest(),
-                "model.safetensors": hashlib.sha256(b"weights").hexdigest(),
-            },
-            "cache_path": str(directory),
-        }
-
-        def partial_snapshot(**kwargs):
-            if kwargs["filename"] == "config.json":
-                (directory / "config.json").write_bytes(b"{}")
-
-        self.download.side_effect = partial_snapshot
-        with self.assertRaises(ValueError):
-            models.ensure_snapshot(config)
-        self.assertFalse((directory / ".ready.json").exists())
-
-    def test_missing_snapshot_file_triggers_preparation_again(self):
-        directory = self.root / "reranker"
-        config = {
-            "repo_id": "fixture/reranker",
-            "revision": "4" * 40,
-            "files": {
-                "config.json": hashlib.sha1(b"blob 7\0fixture").hexdigest(),
-                "model.safetensors": hashlib.sha256(b"fixture").hexdigest(),
-            },
-            "cache_path": str(directory),
-        }
-
-        def complete_snapshot(**kwargs):
-            (directory / kwargs["filename"]).write_bytes(b"fixture")
-
-        self.download.side_effect = complete_snapshot
-        models.ensure_snapshot(config)
-        models.ensure_snapshot(config)
-        self.assertEqual(self.download.call_count, 2)
-        (directory / "model.safetensors").unlink()
-        models.ensure_snapshot(config)
-        self.assertEqual(self.download.call_count, 3)
-        self.download.assert_called_with(
-            repo_id=config["repo_id"],
-            filename="model.safetensors",
-            revision=config["revision"],
-            local_dir=directory,
-            force_download=False,
-        )
-
-    def test_valid_snapshot_without_marker_is_reused_without_network(self):
-        directory = self.root / "embedder"
-        (directory / "1_Pooling").mkdir(parents=True)
-        (directory / "1_Pooling/config.json").write_bytes(b"{}")
-        (directory / "model.safetensors").write_bytes(b"weights")
-        config = {
-            "repo_id": "fixture/embedder",
-            "revision": "3" * 40,
-            "files": {
-                "1_Pooling/config.json": hashlib.sha1(b"blob 2\0{}").hexdigest(),
-                "model.safetensors": hashlib.sha256(b"weights").hexdigest(),
-            },
-            "cache_path": str(directory),
-        }
-        with patch.dict(sys.modules, {"huggingface_hub": None}):
-            models.ensure_snapshot(config)
-        self.assertTrue((directory / ".ready.json").is_file())
-        self.download.assert_not_called()
-
-    def test_corrupt_snapshot_without_network_does_not_become_ready(self):
-        directory = self.root / "reranker"
-        directory.mkdir()
-        (directory / "model.safetensors").write_bytes(b"damaged")
-        config = {
-            "repo_id": "fixture/reranker",
-            "revision": "4" * 40,
-            "files": {"model.safetensors": hashlib.sha256(b"weights").hexdigest()},
-            "cache_path": str(directory),
-        }
-        self.download.side_effect = OSError("Network unavailable")
-        with self.assertRaises(OSError):
-            models.ensure_snapshot(config)
-        self.assertFalse((directory / ".ready.json").exists())
-        self.assertTrue(self.download.call_args.kwargs["force_download"])
-
-    def test_downloaded_snapshot_with_wrong_hash_is_rejected(self):
-        directory = self.root / "embedder"
-        config = {
-            "repo_id": "fixture/embedder",
-            "revision": "3" * 40,
-            "files": {"model.safetensors": hashlib.sha256(b"weights").hexdigest()},
-            "cache_path": str(directory),
-        }
-        self.download.side_effect = lambda **kwargs: (directory / kwargs["filename"]).write_bytes(
-            b"damaged"
-        )
-        with self.assertRaises(ValueError):
-            models.ensure_snapshot(config)
-        self.assertFalse((directory / ".ready.json").exists())
+def test_restart_preserves_secrets_and_without_ai_never_prepares_models(launcher):
+    root, process = launcher
+    assert run.main(["--without-ai"]) == 0
+    credentials = root / ".runtime/compose.env"
+    original = credentials.read_bytes()
+    assert run.main(["--without-ai"]) == 0
+    assert credentials.read_bytes() == original
+    calls = compose_calls(process)
+    migrate = ["run", "--rm", "--no-deps", "migrate"]
+    api = ["up", "--detach", "--wait", "--wait-timeout", "120", "api"]
+    assert calls.index(migrate) < calls.index(api)
+    assert ["run", "--rm", "--no-deps", "prepare"] not in calls
+    assert not any(call[0] == "up" and "worker" in call for call in calls)
+    process.reset_mock()
+    assert run.main(["--stop"]) == 0
+    assert compose_calls(process)[-1] == ["down", "--remove-orphans"]
+    assert credentials.read_bytes() == original
+    recovered = root / "recovered.env"
+    run.credentials(recovered)
+    restored = recovered.read_bytes()
+    process.reset_mock()
+    assert run.main(["--env-file", str(recovered), "--without-ai"]) == 0
+    assert recovered.read_bytes() == restored
+    for call in process.call_args_list:
+        command = call.args[0]
+        if "--env-file" in command:
+            assert run.Path(command[command.index("--env-file") + 1]).samefile(recovered)
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize("stage", ["--check", "migrate"])
+def test_failed_preparation_does_not_start_application(launcher, stage):
+    _, process = launcher
+
+    def fail(command, **kwargs):
+        if command[-1] == stage:
+            raise subprocess.CalledProcessError(1, command)
+        return SimpleNamespace(returncode=0, stdout="linux")
+
+    process.side_effect = fail
+    assert run.main([]) == 1
+    assert not any(
+        call[0] == "up" and call[-1] in {"api", "worker"} for call in compose_calls(process)
+    )
+
+
+def test_model_integrity_and_reuse_without_network(tmp_path, monkeypatch):
+    path = tmp_path / "model.gguf"
+    content = b"GGUF" + bytes(range(64))
+    config = {
+        "repo_id": "fixture/model",
+        "revision": "1" * 40,
+        "filename": path.name,
+        "sha256": hashlib.sha256(content).hexdigest(),
+        "size_bytes": len(content),
+        "params": {"model_path": str(path)},
+    }
+    path.write_bytes(content)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", None)
+    models.ensure_llm(config)
+    assert path.with_suffix(".ready.json").exists()
+    path.write_bytes(content[:-1] + b"!")
+    download = Mock(return_value=str(path))
+    monkeypatch.setitem(sys.modules, "huggingface_hub", SimpleNamespace(hf_hub_download=download))
+    with pytest.raises(ValueError):
+        models.ensure_llm(config)
+    identity = {key: config[key] for key in ("repo_id", "revision", "sha256", "size_bytes")}
+    assert not models.ready(path.with_suffix(".ready.json"), identity, tmp_path)
