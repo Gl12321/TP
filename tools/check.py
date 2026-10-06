@@ -138,6 +138,9 @@ def preflight(mode, commands, environment):
 
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description="Проверки Разбора без автоматической установки зависимостей и моделей.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -148,6 +151,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     commands = plan(args.mode)
     environment = os.environ.copy()
+    environment["PYTHONIOENCODING"] = "utf-8"
     try:
         lines = test_lines()
         print(f"Тестовый бюджет: {lines} / 3000 физических строк.", flush=True)
